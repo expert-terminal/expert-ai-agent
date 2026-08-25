@@ -291,10 +291,19 @@ ipcMain.handle('dependencies:check', async () => {
     { name: 'pi-agent-core', pkg: '@earendil-works/pi-agent-core' },
   ];
   const results = [];
+
+  // Check filesystem directly (works inside asar)
+  const nodeModulesPath = path.join(__dirname, '..', 'node_modules');
+
   for (const dep of dependencies) {
+    const pkgPath = path.join(nodeModulesPath, dep.pkg, 'package.json');
     try {
-      const mod = require(dep.pkg);
-      results.push({ name: dep.name, installed: true, version: mod.version || 'unknown' });
+      if (fs.existsSync(pkgPath)) {
+        const pkgJson = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'));
+        results.push({ name: dep.name, installed: true, version: pkgJson.version || 'unknown' });
+      } else {
+        results.push({ name: dep.name, installed: false, version: null });
+      }
     } catch {
       results.push({ name: dep.name, installed: false, version: null });
     }
