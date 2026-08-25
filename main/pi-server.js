@@ -48,6 +48,18 @@ function binaryPath() {
   return path.resolve(__dirname, '..', 'resources', binName);
 }
 
+function ensureBinaryExecutable() {
+  if (process.platform === 'win32') return; // Windows doesn't need chmod
+  const bin = binaryPath();
+  if (!fs.existsSync(bin)) return;
+  try {
+    // Make sure the binary has execute permissions (755)
+    fs.chmodSync(bin, 0o755);
+  } catch (err) {
+    console.warn(`Failed to chmod ${bin}:`, err.message);
+  }
+}
+
 function paths() {
   const dir = path.join(app.getPath('userData'), 'pi-server');
   return {
@@ -273,6 +285,9 @@ class PiServerManager {
     this.lastError = null;
     this.paired = false;
 
+    // Ensure binary has execute permissions (macOS/Linux)
+    ensureBinaryExecutable();
+
     const workdir = this.store.get('workdir');
     const p = await ensureConfig(workdir, relayUrl, this.lastSession);
 
@@ -289,11 +304,24 @@ class PiServerManager {
     // a phone, adding a second one, or just because the user opened Settings),
     // regardless of whether some earlier session is still technically valid.
     // `--qr` forces it every launch.
-    const child = spawn(binaryPath(), ['--config', p.config, '--db', p.db, '--qr'], {
+    const binPath = binaryPath();
+    // Check if binary exists before spawn
+    if (!fs.existsSync(binPath)) {
+      this.lastError = `pi-server binary not found at ${binPath}. Please use Settings → Dependencies to install.`;
+      this._setStatus('error');
+      return;
+    }
+
+    const child = spawn(binPath, ['--config', p.config, '--db', p.db, '--qr'], {
       windowsHide: true,
       env: { ...process.env, EXPERT_AI_RELAY_URL: relayUrl, HOME: isolatedHome, USERPROFILE: isolatedHome },
     });
     this.child = child;
+
+    child.on('error', (err) => {
+      this.lastError = `Failed to start pi-server: ${err.message}. Try: chmod +x ${binPath}`;
+      this._setStatus('error');
+    });
 
     child.stdout.on('data', (d) => {
       this._log(d);
