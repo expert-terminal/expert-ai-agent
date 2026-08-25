@@ -301,22 +301,3 @@ ipcMain.handle('dependencies:check', async () => {
   }
   return results;
 });
-
-ipcMain.handle('dependencies:install', async () => {
-  const { execSync } = require('child_process');
-  try {
-    console.log('Installing npm dependencies...');
-    const appRoot = path.join(__dirname, '..');
-    // Use shell: true to avoid spawn issues on macOS
-    execSync('npm install', {
-      cwd: appRoot,
-      stdio: 'inherit',
-      shell: process.platform === 'win32' ? true : '/bin/bash'
-    });
-    console.log('Dependencies installed successfully');
-    return { success: true };
-  } catch (err) {
-    console.error('Failed to install dependencies:', err);
-    return { success: false, error: `npm install failed: ${err.message}. Try running: cd "${path.join(__dirname, '..')}" && npm install` };
-  }
-});

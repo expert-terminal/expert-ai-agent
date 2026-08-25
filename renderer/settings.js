@@ -174,7 +174,7 @@
     renderSession(null);
   });
 
-  // Dependencies checker
+  // Dependencies checker (read-only, bundled during build)
   async function checkDependencies() {
     const depsListEl = document.getElementById('dependenciesList');
     const depsHintEl = document.getElementById('depsHint');
@@ -204,9 +204,9 @@
       }
 
       depsHintEl.textContent = allInstalled
-        ? 'All dependencies installed. Agent mode is ready.'
-        : 'Some dependencies are missing. Click the button below to install.';
-      depsHintEl.style.color = allInstalled ? '#b6f2c8' : '#f2d9a6';
+        ? 'All dependencies bundled. Agent mode is ready.'
+        : 'Some dependencies missing — this app may not work correctly.';
+      depsHintEl.style.color = allInstalled ? '#b6f2c8' : '#ff6b6b';
     } catch (err) {
       depsHintEl.textContent = `Error checking dependencies: ${err.message}`;
       depsHintEl.style.color = '#ff6b6b';
@@ -214,41 +214,4 @@
   }
 
   checkDependencies();
-
-  document.getElementById('installDeps').addEventListener('click', async () => {
-    const btn = document.getElementById('installDeps');
-    const depsHintEl = document.getElementById('depsHint');
-    const originalText = btn.textContent;
-
-    btn.disabled = true;
-    btn.textContent = 'Installing…';
-    depsHintEl.textContent = 'Running npm install…';
-    depsHintEl.style.color = '#f2d9a6';
-
-    try {
-      const result = await window.expertAgent.installDependencies();
-
-      if (result.success) {
-        await new Promise(resolve => setTimeout(resolve, 500));
-        await checkDependencies();
-        btn.textContent = 'Dependencies Updated';
-        depsHintEl.style.color = '#b6f2c8';
-      } else {
-        depsHintEl.textContent = `Error: ${result.error}`;
-        depsHintEl.style.color = '#ff6b6b';
-        btn.textContent = originalText;
-      }
-    } catch (err) {
-      depsHintEl.textContent = `Error: ${err.message}`;
-      depsHintEl.style.color = '#ff6b6b';
-      btn.textContent = originalText;
-    } finally {
-      setTimeout(() => {
-        btn.disabled = false;
-        if (btn.textContent === 'Dependencies Updated') {
-          btn.textContent = originalText;
-        }
-      }, 2000);
-    }
-  });
 })();
