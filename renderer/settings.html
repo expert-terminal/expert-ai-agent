@@ -40,6 +40,12 @@
   #serverLog { white-space: pre; font-family: "Cascadia Mono", Consolas, monospace; font-size: 9px; line-height: 1; background: #0c0c0c; border: 1px solid #222; border-radius: 6px; padding: 10px; overflow: visible; margin: 0; display: inline-block; }
   #qrImg { display: none; background: #fff; border-radius: 6px; padding: 8px; image-rendering: pixelated; image-rendering: crisp-edges; }
   hr { border: none; border-top: 1px solid #262626; margin: 20px 0; }
+  .dep-item { display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; background: #1e1e1e; border-radius: 4px; margin-bottom: 6px; font-size: 12px; }
+  .dep-name { flex: 1; }
+  .dep-version { color: #888; margin-left: 10px; }
+  .dep-status { display: inline-block; padding: 2px 6px; border-radius: 3px; font-size: 10px; font-weight: 600; }
+  .dep-status.installed { background: #1f5c33; color: #b6f2c8; }
+  .dep-status.missing { background: #5c1f1f; color: #f2b6b6; }
 </style>
 </head>
 <body>
@@ -83,6 +89,15 @@
   <div class="row toggle-row">
     <label for="autoRun">Auto-run agent actions (no confirm prompt)</label>
     <input id="autoRun" type="checkbox" />
+  </div>
+
+  <hr />
+
+  <div class="row">
+    <label>Dependencies</label>
+    <div id="dependenciesList" style="margin-bottom: 12px;"></div>
+    <button id="installDeps" class="primary">Install/Update Dependencies</button>
+    <div class="hint" id="depsHint" style="margin-top: 8px;"></div>
   </div>
 
   <hr />

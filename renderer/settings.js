@@ -173,4 +173,82 @@
     await window.expertAgent.signOut();
     renderSession(null);
   });
+
+  // Dependencies checker
+  async function checkDependencies() {
+    const depsListEl = document.getElementById('dependenciesList');
+    const depsHintEl = document.getElementById('depsHint');
+
+    try {
+      const results = await window.expertAgent.checkDependencies();
+      depsListEl.innerHTML = '';
+      let allInstalled = true;
+
+      for (const dep of results) {
+        const item = document.createElement('div');
+        item.className = 'dep-item';
+        if (dep.installed) {
+          item.innerHTML = `
+            <span class="dep-name">${dep.name}</span>
+            <span class="dep-version">v${dep.version}</span>
+            <span class="dep-status installed">✓ Installed</span>
+          `;
+        } else {
+          allInstalled = false;
+          item.innerHTML = `
+            <span class="dep-name">${dep.name}</span>
+            <span class="dep-status missing">✗ Missing</span>
+          `;
+        }
+        depsListEl.appendChild(item);
+      }
+
+      depsHintEl.textContent = allInstalled
+        ? 'All dependencies installed. Agent mode is ready.'
+        : 'Some dependencies are missing. Click the button below to install.';
+      depsHintEl.style.color = allInstalled ? '#b6f2c8' : '#f2d9a6';
+    } catch (err) {
+      depsHintEl.textContent = `Error checking dependencies: ${err.message}`;
+      depsHintEl.style.color = '#ff6b6b';
+    }
+  }
+
+  checkDependencies();
+
+  document.getElementById('installDeps').addEventListener('click', async () => {
+    const btn = document.getElementById('installDeps');
+    const depsHintEl = document.getElementById('depsHint');
+    const originalText = btn.textContent;
+
+    btn.disabled = true;
+    btn.textContent = 'Installing…';
+    depsHintEl.textContent = 'Running npm install…';
+    depsHintEl.style.color = '#f2d9a6';
+
+    try {
+      const result = await window.expertAgent.installDependencies();
+
+      if (result.success) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+        await checkDependencies();
+        btn.textContent = 'Dependencies Updated';
+        depsHintEl.style.color = '#b6f2c8';
+      } else {
+        depsHintEl.textContent = `Error: ${result.error}`;
+        depsHintEl.style.color = '#ff6b6b';
+        btn.textContent = originalText;
+      }
+    } catch (err) {
+      depsHintEl.textContent = `Error: ${err.message}`;
+      depsHintEl.style.color = '#ff6b6b';
+      btn.textContent = originalText;
+    } finally {
+      setTimeout(() => {
+        btn.disabled = false;
+        if (btn.textContent === 'Dependencies Updated') {
+          btn.textContent = originalText;
+        }
+      }, 2000);
+    }
+  });
 })();

@@ -283,3 +283,35 @@ ipcMain.handle('pi-server:stop', async () => {
   await stopServer();
   return { status: piServerStatus };
 });
+
+ipcMain.handle('dependencies:check', async () => {
+  const dependencies = [
+    { name: 'pi-coding-agent', pkg: '@earendil-works/pi-coding-agent' },
+    { name: 'pi-ai', pkg: '@earendil-works/pi-ai' },
+    { name: 'pi-agent-core', pkg: '@earendil-works/pi-agent-core' },
+  ];
+  const results = [];
+  for (const dep of dependencies) {
+    try {
+      const mod = require(dep.pkg);
+      results.push({ name: dep.name, installed: true, version: mod.version || 'unknown' });
+    } catch {
+      results.push({ name: dep.name, installed: false, version: null });
+    }
+  }
+  return results;
+});
+
+ipcMain.handle('dependencies:install', async () => {
+  const { execSync } = require('child_process');
+  try {
+    console.log('Installing npm dependencies...');
+    const appRoot = path.join(__dirname, '..');
+    execSync('npm install', { cwd: appRoot, stdio: 'inherit' });
+    console.log('Dependencies installed successfully');
+    return { success: true };
+  } catch (err) {
+    console.error('Failed to install dependencies:', err);
+    return { success: false, error: err.message };
+  }
+});

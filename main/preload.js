@@ -22,4 +22,6 @@ contextBridge.exposeInMainWorld('expertAgent', {
     ipcRenderer.on('pi-server:status', listener);
     return () => ipcRenderer.removeListener('pi-server:status', listener);
   },
+  installDependencies: () => ipcRenderer.invoke('dependencies:install'),
+  checkDependencies: () => ipcRenderer.invoke('dependencies:check'),
 });
