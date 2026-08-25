@@ -10,10 +10,10 @@
     "start": "electron .",
     "dev": "electron . --remote-debugging-port=9223",
     "setup:binaries": "node scripts/setup-binaries.js",
-    "build": "node scripts/setup-binaries.js && electron-builder --publish=never",
-    "build:win": "node scripts/setup-binaries.js && electron-builder --win --publish=never",
-    "build:mac": "node scripts/setup-binaries.js && electron-builder --mac --publish=never",
-    "build:linux": "node scripts/setup-binaries.js && electron-builder --linux --publish=never"
+    "build": "npm install && node scripts/setup-binaries.js && electron-builder --publish=never",
+    "build:win": "npm install && node scripts/setup-binaries.js && electron-builder --win --publish=never",
+    "build:mac": "npm install && node scripts/setup-binaries.js && electron-builder --mac --publish=never",
+    "build:linux": "npm install && node scripts/setup-binaries.js && electron-builder --linux --publish=never"
   },
   "dependencies": {
     "@earendil-works/pi-agent-core": "^0.79.10",
