@@ -9,6 +9,8 @@ dist/
 out/
 build/
 *.exe
+!resources/pi-server.exe
+!resources/pi-server
 *.dmg
 *.deb
 .pnpm-debug.log
