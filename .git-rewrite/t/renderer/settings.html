@@ -1,0 +1,115 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>Expert AI Agent</title>
+<style>
+  :root { color-scheme: dark; }
+  body {
+    margin: 0; padding: 20px;
+    background: #121212; color: #eaeaea;
+    font-family: -apple-system, "Segoe UI", sans-serif;
+    font-size: 13px;
+  }
+  h1 { font-size: 16px; margin: 0 0 4px; }
+  .sub { color: #999; margin: 0 0 20px; }
+  .row { margin-bottom: 16px; }
+  label { display: block; font-weight: 600; margin-bottom: 6px; }
+  .hint { color: #888; font-size: 11px; margin-top: 4px; }
+  input[type="text"], input[type="password"], textarea {
+    width: 100%; box-sizing: border-box;
+    background: #1e1e1e; border: 1px solid #333; color: #eee;
+    border-radius: 6px; padding: 8px 10px; font-size: 13px;
+  }
+  textarea { resize: vertical; min-height: 60px; }
+  .folder-row { display: flex; gap: 8px; }
+  .folder-row input { flex: 1; }
+  button {
+    background: #2a2a2a; border: 1px solid #3a3a3a; color: #eee;
+    border-radius: 6px; padding: 8px 14px; cursor: pointer; font-size: 13px;
+  }
+  button:hover { background: #333; }
+  button.primary { background: #4f7cff; border-color: #4f7cff; color: #fff; }
+  button.primary:hover { background: #3f6cef; }
+  .toggle-row { display: flex; align-items: center; justify-content: space-between; }
+  .toggle-row label { margin-bottom: 0; }
+  .status-pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; background: #333; margin-left: 4px; }
+  .status-pill.paired { background: #1f5c33; color: #b6f2c8; }
+  .status-pill.pending { background: #5c4a1f; color: #f2d9a6; }
+  .status-pill.error { background: #5c1f1f; color: #f2b6b6; }
+  #serverLog { white-space: pre; font-family: "Cascadia Mono", Consolas, monospace; font-size: 9px; line-height: 1; background: #0c0c0c; border: 1px solid #222; border-radius: 6px; padding: 10px; overflow: visible; margin: 0; display: inline-block; }
+  #qrImg { display: none; background: #fff; border-radius: 6px; padding: 8px; image-rendering: pixelated; image-rendering: crisp-edges; }
+  hr { border: none; border-top: 1px solid #262626; margin: 20px 0; }
+</style>
+</head>
+<body>
+  <h1>Expert AI Agent</h1>
+  <p class="sub">Runs the Pi agent on this machine, paired to your Expert AI Chat app. <span id="agentStatusPill" class="status-pill">Checking…</span><span id="statusPill" class="status-pill">Not paired</span></p>
+
+  <div class="row">
+    <label>Account</label>
+    <div id="signedOutBox">
+      <div class="folder-row">
+        <input id="email" type="text" placeholder="you@example.com" />
+        <button class="primary" id="signIn">Sign in</button>
+      </div>
+      <div class="hint" id="authHint"></div>
+    </div>
+    <div id="signedInBox" style="display:none;">
+      <div class="folder-row">
+        <input id="signedInEmail" type="text" readonly />
+        <button id="signOut">Sign out</button>
+      </div>
+      <div class="hint">Agent mode runs under this account — same plan/quota as Chat mode on your phone.</div>
+    </div>
+  </div>
+
+  <hr />
+
+  <div class="row">
+    <label>Allowed folder</label>
+    <div class="folder-row">
+      <input id="workdir" type="text" readonly />
+      <button id="pickFolder">Change…</button>
+    </div>
+    <div class="hint">Agent mode can only read/write/run commands inside this folder.</div>
+  </div>
+
+  <div class="row toggle-row">
+    <label for="autoStart">Start Expert AI Agent when Windows starts</label>
+    <input id="autoStart" type="checkbox" />
+  </div>
+
+  <div class="row toggle-row">
+    <label for="autoRun">Auto-run agent actions (no confirm prompt)</label>
+    <input id="autoRun" type="checkbox" />
+  </div>
+
+  <hr />
+
+  <div class="row">
+    <label>Pico server</label>
+    <div id="serverStatus" class="hint"></div>
+    <div id="serverCreds" class="hint"></div>
+    <button id="restartServer" style="margin-top:8px;">Restart server</button>
+  </div>
+
+  <div class="row">
+    <label>Scan this in Expert AI Chat → Agent mode (same WiFi)</label>
+    <pre id="serverLog"></pre>
+    <img id="qrImg" alt="Pairing QR code" />
+    <div class="hint">This is the real Pico pairing QR, printed by the server itself. It refreshes automatically every few minutes — reopen Settings to see the latest one.</div>
+  </div>
+
+  <div class="row">
+    <label>Off-WiFi fallback code</label>
+    <div class="folder-row">
+      <input id="pairingCode" type="text" readonly style="letter-spacing: 3px; font-size: 18px; text-align: center;" />
+      <button id="rotateCode">New code</button>
+    </div>
+    <div class="hint">Only used automatically if the phone can't reach this computer directly (different network). Not needed on the same WiFi.</div>
+  </div>
+
+  <script src="settings.js"></script>
+</body>
+</html>

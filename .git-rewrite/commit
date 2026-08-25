@@ -1,0 +1,13 @@
+tree 9604bf00df57fbf638c1277c824fd5c8dbeb3119
+author Expert AI <samarvirdi@gmail.com> 1787616678 +0530
+committer Expert AI <samarvirdi@gmail.com> 1787616678 +0530
+
+Initial commit: Expert AI Tray Agent
+
+Windows system tray integration for Expert AI with:
+- QR-based device pairing
+- Server control (Start/Stop)
+- Real-time connection monitoring
+- Native Windows aesthetic
+
+Co-Authored-By: Claude Haiku 4.5 <noreply@anthropic.com>

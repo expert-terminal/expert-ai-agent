@@ -1,0 +1,94 @@
+{
+  "name": "expert-ai-agent",
+  "version": "0.1.0",
+  "description": "Expert AI Agent - lightweight tray app that pairs this machine with the Expert AI Chat phone app and runs the Pi agent locally, relayed over Cloudflare.",
+  "main": "main/index.js",
+  "type": "commonjs",
+  "author": "ssv.asia",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --remote-debugging-port=9223",
+    "build": "electron-builder --publish=never",
+    "build:win": "electron-builder --win --publish=never",
+    "build:mac": "electron-builder --mac --publish=never",
+    "build:linux": "electron-builder --linux --publish=never"
+  },
+  "dependencies": {
+    "@earendil-works/pi-agent-core": "^0.79.10",
+    "@earendil-works/pi-ai": "^0.79.10",
+    "qrcode": "^1.5.4",
+    "typebox": "^1.1.38",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "electron": "^42.4.1",
+    "electron-builder": "^24.9.1"
+  },
+  "build": {
+    "appId": "asia.ssv.expert-ai-agent",
+    "productName": "Expert AI Agent",
+    "artifactName": "${productName}-${version}-${arch}.${ext}",
+    "directories": {
+      "buildResources": "assets",
+      "output": "dist"
+    },
+    "files": [
+      "main/**/*",
+      "renderer/**/*",
+      "assets/**/*",
+      "node_modules/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "resources",
+        "to": ".",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "assets/icon.ico"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "runAfterFinish": true
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
+      "icon": "assets/icon.png",
+      "category": "public.app-category.productivity"
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "assets/icon.png",
+      "category": "Utility"
+    }
+  }
+}
