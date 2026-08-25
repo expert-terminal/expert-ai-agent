@@ -11,6 +11,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build pi-server for macOS
+        run: |
+          cd backend
+          cargo build --release --target aarch64-apple-darwin
+          cargo build --release --target x86_64-apple-darwin
+          cp target/aarch64-apple-darwin/release/pi-server ../expert-ai-agent/resources/
+          cp target/x86_64-apple-darwin/release/pi-server ../expert-ai-agent/resources/pi-server-x64
+        working-directory: ${{ github.workspace }}
+        continue-on-error: true
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
