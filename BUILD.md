@@ -4,7 +4,8 @@
 
 - Node.js 22+ (for development)
 - Electron and electron-builder (automatically installed via npm)
-- **Critical**: Pre-built `pi-server` binaries (Pico backend)
+- **Critical**: `pico-upstream` repository (Rust Pico backend) for building `pi-server`
+- Rust toolchain (if building pico-upstream locally)
 
 ## Required Binaries
 
@@ -12,36 +13,58 @@ The Tray Agent is a lightweight Electron wrapper around the `pi-server` backend.
 
 ### What is pi-server?
 
-- **pi-server**: The Pico backend server (compiled from pico-upstream, written in Rust)
-- **node**: Node.js runtime (portable version included with pi-node package)
+- **pi-server**: The Pico backend server (compiled from `pico-upstream`, written in Rust)
+- **node**: Node.js runtime (optional — can use system `node` if available)
 
-These binaries are NOT included in the source repo — they must be provided separately.
+### Getting pi-server from pico-upstream
 
-### Where to get pi-server
+The setup script will **automatically detect and build** `pico-upstream` if it's in a standard location:
 
-**Option 1: Pre-built binaries**
-If your organization has pre-built pi-server binaries:
-1. Download the binaries for your target platforms (macOS arm64, macOS x64, Windows x64)
-2. Place them in:
-   ```
-   resources/pi-server.exe          # Windows
-   resources/pi-server              # macOS/Linux
-   ```
-
-**Option 2: Build from source**
-If you have access to the pico-upstream repository:
-```bash
-# Build pi-server for your platform
-cd path/to/pico-upstream
-cargo build --release
-
-# Copy the binary
-cp target/release/pi-server ../expert-ai-tray/resources/
+```
+../pico-upstream/              # Sibling directory (recommended)
 ```
 
-For cross-platform builds (e.g., building macOS binaries on Windows), you'll need:
-- macOS host or cross-compilation toolchain (e.g., `cargo-osxcross`)
-- Docker (for containerized cross-compilation)
+**Option 1: Automatic (recommended)**
+
+If `pico-upstream` is in a sibling directory:
+
+```bash
+npm run build:mac        # or build:win, build:linux
+# Setup script will auto-detect, build, and copy pi-server
+```
+
+**Option 2: Explicit path**
+
+If `pico-upstream` is elsewhere:
+
+```bash
+PICO_UPSTREAM_PATH=/path/to/pico-upstream npm run build:mac
+```
+
+**Option 3: Manual**
+
+Build pico-upstream yourself:
+
+```bash
+# In pico-upstream directory
+cargo build --release
+
+# Copy to tray repo
+cp target/release/pi-server ../expert-ai-tray/resources/
+# On Windows:
+# cp target/release/pi-server.exe ../expert-ai-tray/resources/
+
+# Then build tray app
+cd ../expert-ai-tray
+npm run build:mac
+```
+
+### Cross-platform builds
+
+Building for other platforms requires appropriate toolchains:
+- **macOS from Windows**: GitHub Actions uses `macos-latest` runner (recommended)
+- **macOS cross-compile**: Requires macOS host or `cargo-osxcross`
+- **Windows cross-compile**: Windows host recommended for exe signing
 
 ## Build Instructions
 
