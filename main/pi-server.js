@@ -307,19 +307,34 @@ class PiServerManager {
     const binPath = binaryPath();
     // Check if binary exists before spawn
     if (!fs.existsSync(binPath)) {
-      this.lastError = `pi-server binary not found at ${binPath}. Please use Settings → Dependencies to install.`;
+      this.lastError = `pi-server binary not found at ${binPath}. Make sure the app was installed correctly.`;
       this._setStatus('error');
       return;
     }
 
+    // Check if binary is executable (macOS/Linux)
+    if (process.platform !== 'win32') {
+      try {
+        fs.accessSync(binPath, fs.constants.X_OK);
+      } catch (e) {
+        this.lastError = `pi-server binary exists but is not executable. Fixed automatically on next restart.`;
+        this._setStatus('error');
+        return;
+      }
+    }
+
     const child = spawn(binPath, ['--config', p.config, '--db', p.db, '--qr'], {
       windowsHide: true,
+      shell: false,
       env: { ...process.env, EXPERT_AI_RELAY_URL: relayUrl, HOME: isolatedHome, USERPROFILE: isolatedHome },
     });
     this.child = child;
 
     child.on('error', (err) => {
-      this.lastError = `Failed to start pi-server: ${err.message}. Try: chmod +x ${binPath}`;
+      const errorMsg = err.code === 'ENOENT'
+        ? `pi-server binary not found or not executable`
+        : `Failed to start pi-server: ${err.message}`;
+      this.lastError = errorMsg;
       this._setStatus('error');
     });
 
