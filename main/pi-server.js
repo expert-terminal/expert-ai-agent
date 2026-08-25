@@ -27,21 +27,25 @@ function resourcesRoot() {
 }
 
 function bundledNodeBinary() {
-  return path.join(resourcesRoot(), 'node.exe');
+  const isWin = process.platform === 'win32';
+  return path.join(resourcesRoot(), isWin ? 'node.exe' : 'node');
 }
 
 function bundledPiBinary() {
-  // pi.cmd (not the extension-less `pi` POSIX shim) — this is a Windows-only tray
-  // app right now, same scope as pi-server.exe itself.
-  return path.join(resourcesRoot(), 'pi.cmd');
+  const isWin = process.platform === 'win32';
+  // Windows: pi.cmd (batch file); macOS/Linux: pi (executable shell script)
+  return path.join(resourcesRoot(), isWin ? 'pi.cmd' : 'pi');
 }
 
 function binaryPath() {
-  // Packaged app: resources/pi-server.exe sits next to the app bundle (electron-builder
+  // Packaged app: resources/pi-server[.exe] sits next to the app bundle (electron-builder
   // "extraResources"). Dev mode: the same file straight from the repo.
-  const packaged = path.join(process.resourcesPath, 'pi-server.exe');
+  // Windows: pi-server.exe; macOS/Linux: pi-server (Mach-O or ELF binary)
+  const isWin = process.platform === 'win32';
+  const binName = isWin ? 'pi-server.exe' : 'pi-server';
+  const packaged = path.join(process.resourcesPath, binName);
   if (fs.existsSync(packaged)) return packaged;
-  return path.resolve(__dirname, '..', 'resources', 'pi-server.exe');
+  return path.resolve(__dirname, '..', 'resources', binName);
 }
 
 function paths() {

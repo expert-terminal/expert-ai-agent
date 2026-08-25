@@ -9,10 +9,12 @@
   "scripts": {
     "start": "electron .",
     "dev": "electron . --remote-debugging-port=9223",
-    "build": "electron-builder --publish=never",
-    "build:win": "electron-builder --win --publish=never",
-    "build:mac": "electron-builder --mac --publish=never",
-    "build:linux": "electron-builder --linux --publish=never"
+    "setup:binaries": "node scripts/setup-binaries.js",
+    "preinstall": "npm run setup:binaries || true",
+    "build": "npm run setup:binaries && electron-builder --publish=never",
+    "build:win": "npm run setup:binaries && electron-builder --win --publish=never",
+    "build:mac": "npm run setup:binaries && electron-builder --mac --publish=never",
+    "build:linux": "npm run setup:binaries && electron-builder --linux --publish=never"
   },
   "dependencies": {
     "@earendil-works/pi-agent-core": "^0.79.10",
