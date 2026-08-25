@@ -124,7 +124,7 @@ async function setup() {
     return true;
   }
 
-  console.log(`\n⚠️  Missing ${missing.length} required binary/binaries\n`);
+  console.log(`\n⚠️  Missing ${missing.length} binary/binaries (build will proceed but server may not start)\n`);
 
   // Try to auto-build from pico-upstream
   const picoPath = findPicoUpstream();
@@ -169,7 +169,9 @@ Environment variables:
 More info: See BUILD.md in this repo
 `);
 
-  process.exit(1);
+  // Don't block build - just warn user
+  console.log('\n⏭️  Proceeding without binaries. Server may not start until they are added.\n');
+  return false;
 }
 
 setup().catch((err) => {
