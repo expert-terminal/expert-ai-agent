@@ -10,9 +10,10 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-          fetch-depth: 0
+
+      - name: Initialize submodules
+        run: |
+          git submodule update --init --recursive --depth 1 vendor/expert-ai-phone
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
