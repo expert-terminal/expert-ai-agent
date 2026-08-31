@@ -80,7 +80,10 @@
         }
       ],
       "icon": "assets/icon.png",
-      "category": "public.app-category.productivity"
+      "category": "public.app-category.productivity",
+      "extendInfo": {
+        "NSLocalNetworkUsageDescription": "Expert AI Agent runs a local server so your paired phone can connect."
+      }
     },
     "linux": {
       "target": [

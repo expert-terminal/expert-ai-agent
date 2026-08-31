@@ -29,6 +29,27 @@ jobs:
           cp target/x86_64-apple-darwin/release/pi-server ../../../resources/pi-server-x64
         continue-on-error: false
 
+      - name: Bundle a universal macOS Node into the pi engine
+        # resources/pi-node/ ships only the Windows node.exe in git. The macOS
+        # dmgs need a native `node` for Agent-mode chat (the `pi` launcher execs
+        # "$basedir/node"). electron-builder packs the same resources/ into BOTH
+        # the arm64 and x64 dmgs, so a single file must run on both arches ->
+        # lipo the two official Node builds into one universal binary.
+        run: |
+          set -euo pipefail
+          NODE_VERSION=v22.19.0
+          for arch in arm64 x64; do
+            curl -fsSL "https://nodejs.org/dist/${NODE_VERSION}/node-${NODE_VERSION}-darwin-${arch}.tar.gz" -o "node-${arch}.tar.gz"
+            tar -xzf "node-${arch}.tar.gz"
+          done
+          lipo -create \
+            "node-${NODE_VERSION}-darwin-arm64/bin/node" \
+            "node-${NODE_VERSION}-darwin-x64/bin/node" \
+            -output resources/pi-node/node
+          chmod +x resources/pi-node/node
+          file resources/pi-node/node
+          "resources/pi-node/node" --version
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
