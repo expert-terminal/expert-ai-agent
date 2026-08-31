@@ -16,7 +16,12 @@ dist/
 .env.*.local
 *.tsbuildinfo
 out/
-build/
+# `build/` is electron-builder scratch output — EXCEPT installer.nsh, which is a
+# committed source file (package.json nsis.include points at it: it overrides the
+# "close the running app" installer step for this tray app). A fresh clone / CI
+# build needs it or `electron-builder --win` produces a broken installer.
+build/*
+!build/installer.nsh
 *.exe
 !resources/pi-server.exe
 !resources/pi-node/node.exe
