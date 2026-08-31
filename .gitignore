@@ -1,31 +1,46 @@
+# App's own dependency tree (also catches nested node_modules in leftover
+# backup dirs). The bundled pi runtime under resources/pi-node/ is re-included
+# at the bottom.
 node_modules/
-# The bundled pi-coding-agent payload inside resources/pi-node/ is NOT the app's
-# own dependency tree — it's a self-contained runtime the packaged app spawns as a
-# subprocess (see main/pi-server.js's bundledPiBinary()/bundledNodeBinary()). The
-# blanket node_modules/ rule above previously excluded it from git entirely, which
-# is exactly why it was missing on this machine until this fix — the app worked
-# once locally, relied on files nobody actually committed, and a fresh clone/CI
-# build never had them. Keep this tracked so the fix persists.
-!resources/pi-node/node_modules/
-!resources/pi-node/node_modules/**
-dist/
+
+# ---------------------------------------------------------------------------
+# ANCHOR these to the repo root (leading /). An un-anchored `build/` or `dist/`
+# ALSO matches those same dir names nested deep inside
+# resources/pi-node/node_modules/ — transitive deps ship compiled code under
+# build//dist/ — which silently dropped ~4200 real runtime files from git and
+# gave fresh-clone / CI builds a broken pi engine.
+# ---------------------------------------------------------------------------
+/dist/
+/out/
+/build/*
+!/build/installer.nsh
+
 *.log
 .DS_Store
 .env
 .env.local
 .env.*.local
 *.tsbuildinfo
-out/
-# `build/` is electron-builder scratch output — EXCEPT installer.nsh, which is a
-# committed source file (package.json nsis.include points at it: it overrides the
-# "close the running app" installer step for this tray app). A fresh clone / CI
-# build needs it or `electron-builder --win` produces a broken installer.
-build/*
-!build/installer.nsh
-*.exe
-!resources/pi-server.exe
-!resources/pi-node/node.exe
-!resources/pi-server
 *.dmg
 *.deb
 .pnpm-debug.log
+
+# Native/Windows binaries: ignored by default, except the ones we ship.
+*.exe
+!resources/pi-server.exe
+!resources/pi-server
+
+# Leftover local dirs — never part of a build, safe to delete, must never be
+# committed.
+/.pi-node-bak-DELETE-ME/
+/mac-builds/
+
+# ---------------------------------------------------------------------------
+# The bundled pi engine — portable Node + @earendil-works/pi-coding-agent — is a
+# self-contained runtime the packaged app spawns as a subprocess
+# (main/pi-server.js bundledPiBinary()/bundledNodeBinary()). It MUST be committed
+# in full or a fresh clone / GitHub Actions build ships an app whose Agent mode
+# can't start. Re-include everything under it that any rule above would drop.
+# ---------------------------------------------------------------------------
+!resources/pi-node/**
+!resources/pi-node/node_modules/**
