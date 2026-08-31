@@ -1,4 +1,13 @@
 node_modules/
+# The bundled pi-coding-agent payload inside resources/pi-node/ is NOT the app's
+# own dependency tree — it's a self-contained runtime the packaged app spawns as a
+# subprocess (see main/pi-server.js's bundledPiBinary()/bundledNodeBinary()). The
+# blanket node_modules/ rule above previously excluded it from git entirely, which
+# is exactly why it was missing on this machine until this fix — the app worked
+# once locally, relied on files nobody actually committed, and a fresh clone/CI
+# build never had them. Keep this tracked so the fix persists.
+!resources/pi-node/node_modules/
+!resources/pi-node/node_modules/**
 dist/
 *.log
 .DS_Store
@@ -10,6 +19,7 @@ out/
 build/
 *.exe
 !resources/pi-server.exe
+!resources/pi-node/node.exe
 !resources/pi-server
 *.dmg
 *.deb

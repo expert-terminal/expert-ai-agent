@@ -9,6 +9,7 @@ const DEFAULTS = {
   workdir: app.getPath('documents'),
   autoRun: true,        // matches the "auto-run, no confirm prompts" default agreed for v1
   autoStart: true,
+  hasCompletedSetup: false, // drives the first-run wizard vs. the compact dashboard
 };
 
 class Store {

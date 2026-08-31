@@ -4,19 +4,35 @@
 // the same account/entitlement as Chat mode on the phone, no separate credential path.
 const { shell } = require('electron');
 
-const WORKER_URL = 'https://expert-ai-gateway.arthouse.workers.dev';
+// Custom domain first (verified 2026-08-29), workers.dev only as a fallback.
+// Indian ISP resolvers (Jio/Airtel/ACT) commonly NXDOMAIN Cloudflare's shared
+// *.workers.dev ranges, which used to make sign-in on a hostile Wi-Fi fail hard —
+// api.ssv.asia is a dedicated zone those blocklists don't touch.
+const WORKER_HOSTS = [
+  'https://api.ssv.asia',
+  'https://expert-ai-gateway.arthouse.workers.dev',
+];
+const WORKER_URL = WORKER_HOSTS[0];
 const POLL_INTERVAL_MS = 3000;
 const POLL_TIMEOUT_MS = 5 * 60 * 1000;
 
 async function api(method, path, body) {
-  const r = await fetch(`${WORKER_URL}${path}`, {
-    method,
-    headers: { 'content-type': 'application/json' },
-    body: body ? JSON.stringify(body) : undefined,
-  });
-  let data = {};
-  try { data = await r.json(); } catch { /* non-JSON error body */ }
-  return { ok: r.ok, status: r.status, data };
+  let lastErr;
+  for (const host of WORKER_HOSTS) {
+    try {
+      const r = await fetch(`${host}${path}`, {
+        method,
+        headers: { 'content-type': 'application/json' },
+        body: body ? JSON.stringify(body) : undefined,
+      });
+      let data = {};
+      try { data = await r.json(); } catch { /* non-JSON error body */ }
+      return { ok: r.ok, status: r.status, data };
+    } catch (err) {
+      lastErr = err; // network/DNS failure — try the next host
+    }
+  }
+  throw lastErr || new Error('Network request failed');
 }
 
 /** Starts device login for `email`, opens the Ghost verify page, and polls until the

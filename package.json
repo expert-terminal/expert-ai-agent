@@ -10,6 +10,7 @@
     "start": "electron .",
     "dev": "electron . --remote-debugging-port=9223",
     "setup:binaries": "node scripts/setup-binaries.js",
+    "update:pi": "node scripts/update-pi-engine.js",
     "build": "npm install && node scripts/setup-binaries.js && electron-builder --publish=never",
     "build:win": "npm install && node scripts/setup-binaries.js && electron-builder --win --publish=never",
     "build:mac": "npm install && node scripts/setup-binaries.js && electron-builder --mac --publish=never",
@@ -65,7 +66,8 @@
     "nsis": {
       "oneClick": true,
       "perMachine": false,
-      "runAfterFinish": true
+      "runAfterFinish": true,
+      "include": "build/installer.nsh"
     },
     "mac": {
       "target": [

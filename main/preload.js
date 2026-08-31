@@ -22,6 +22,13 @@ contextBridge.exposeInMainWorld('expertAgent', {
     ipcRenderer.on('pi-server:status', listener);
     return () => ipcRenderer.removeListener('pi-server:status', listener);
   },
+  onPaired: (callback) => {
+    const listener = () => callback();
+    ipcRenderer.on('pi-server:paired', listener);
+    return () => ipcRenderer.removeListener('pi-server:paired', listener);
+  },
   installDependencies: () => ipcRenderer.invoke('dependencies:install'),
   checkDependencies: () => ipcRenderer.invoke('dependencies:check'),
+  getDiagnostics: () => ipcRenderer.invoke('diagnostics:get'),
+  openExternal: (url) => ipcRenderer.invoke('shell:openExternal', url),
 });

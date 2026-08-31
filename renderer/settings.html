@@ -4,125 +4,250 @@
 <meta charset="utf-8" />
 <title>Expert AI Agent</title>
 <style>
-  :root { color-scheme: dark; }
+  :root {
+    color-scheme: dark;
+    --bg: #0f0f1e;
+    --card: #17172a;
+    --card-border: #262640;
+    --text: #f0eefc;
+    --text-muted: #9b98b8;
+    --text-faint: #6f6c8c;
+    --accent: #7c3aed;
+    --accent-hover: #6d2fd1;
+    --green: #2ecc71;
+    --amber: #f1c40f;
+    --red: #e74c3c;
+    --input-bg: #1c1c33;
+    --input-border: #33324f;
+  }
+  * { box-sizing: border-box; }
   body {
-    margin: 0; padding: 20px;
-    background: #121212; color: #eaeaea;
+    margin: 0; padding: 24px 28px 40px;
+    background: var(--bg); color: var(--text);
     font-family: -apple-system, "Segoe UI", sans-serif;
     font-size: 13px;
   }
-  h1 { font-size: 16px; margin: 0 0 4px; }
-  .sub { color: #999; margin: 0 0 20px; }
-  .row { margin-bottom: 16px; }
-  label { display: block; font-weight: 600; margin-bottom: 6px; }
-  .hint { color: #888; font-size: 11px; margin-top: 4px; }
+  .app-header { display: flex; align-items: center; gap: 14px; margin-bottom: 22px; }
+  .app-header img { width: 44px; height: 44px; border-radius: 12px; }
+  .app-header h1 { font-size: 18px; margin: 0; }
+  .app-header .sub { color: var(--text-muted); margin: 2px 0 0; font-size: 12.5px; }
+
+  .card {
+    background: var(--card); border: 1px solid var(--card-border);
+    border-radius: 14px; padding: 18px 20px; margin-bottom: 14px;
+  }
+  .card > label, .card-title {
+    display: block; font-weight: 600; margin-bottom: 10px; font-size: 12.5px;
+    text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted);
+  }
+  .hint { color: var(--text-faint); font-size: 11.5px; margin-top: 6px; line-height: 1.5; }
+
   input[type="text"], input[type="password"], textarea {
-    width: 100%; box-sizing: border-box;
-    background: #1e1e1e; border: 1px solid #333; color: #eee;
-    border-radius: 6px; padding: 8px 10px; font-size: 13px;
+    width: 100%;
+    background: var(--input-bg); border: 1px solid var(--input-border); color: var(--text);
+    border-radius: 8px; padding: 9px 11px; font-size: 13px;
   }
   textarea { resize: vertical; min-height: 60px; }
   .folder-row { display: flex; gap: 8px; }
   .folder-row input { flex: 1; }
+
   button {
-    background: #2a2a2a; border: 1px solid #3a3a3a; color: #eee;
-    border-radius: 6px; padding: 8px 14px; cursor: pointer; font-size: 13px;
+    background: #24243d; border: 1px solid #34345a; color: var(--text);
+    border-radius: 8px; padding: 9px 15px; cursor: pointer; font-size: 13px;
+    transition: background 0.15s;
   }
-  button:hover { background: #333; }
-  button.primary { background: #4f7cff; border-color: #4f7cff; color: #fff; }
-  button.primary:hover { background: #3f6cef; }
-  .toggle-row { display: flex; align-items: center; justify-content: space-between; }
-  .toggle-row label { margin-bottom: 0; }
-  .status-pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; background: #333; margin-left: 4px; }
-  .status-pill.paired { background: #1f5c33; color: #b6f2c8; }
-  .status-pill.pending { background: #5c4a1f; color: #f2d9a6; }
-  .status-pill.error { background: #5c1f1f; color: #f2b6b6; }
-  #serverLog { white-space: pre; font-family: "Cascadia Mono", Consolas, monospace; font-size: 9px; line-height: 1; background: #0c0c0c; border: 1px solid #222; border-radius: 6px; padding: 10px; overflow: visible; margin: 0; display: inline-block; }
-  #qrImg { display: none; background: #fff; border-radius: 6px; padding: 8px; image-rendering: pixelated; image-rendering: crisp-edges; }
-  hr { border: none; border-top: 1px solid #262626; margin: 20px 0; }
-  .dep-item { display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; background: #1e1e1e; border-radius: 4px; margin-bottom: 6px; font-size: 12px; }
+  button:hover { background: #2d2d4d; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.primary:hover { background: var(--accent-hover); }
+  button.subtle { background: transparent; border-color: transparent; color: var(--text-muted); padding: 6px 4px; }
+  button.subtle:hover { color: var(--text); background: transparent; }
+
+  /* ---- Hero connection card ---- */
+  .hero { text-align: center; padding: 26px 20px; }
+  .hero-state { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  .status-dot { width: 14px; height: 14px; border-radius: 50%; background: var(--text-faint); }
+  .status-dot.waiting { background: var(--amber); box-shadow: 0 0 0 6px rgba(241,196,15,0.15); }
+  .status-dot.connected { background: var(--green); box-shadow: 0 0 0 6px rgba(46,204,113,0.15); }
+  .status-dot.error { background: var(--red); box-shadow: 0 0 0 6px rgba(231,76,60,0.15); }
+  .hero-title { font-size: 16px; font-weight: 600; margin: 0; }
+  .hero-sub { color: var(--text-muted); font-size: 12.5px; margin: 0; }
+  .hero-error-text { color: var(--red); font-size: 12px; margin-top: 4px; }
+
+  .qr-wrap { margin-top: 18px; display: none; flex-direction: column; align-items: center; gap: 10px; }
+  .qr-wrap.visible { display: flex; }
+  /* Big enough that even a high-version QR keeps its modules >=3px and a phone
+     camera can decode it off-screen. Nearest-neighbour scaling keeps edges sharp. */
+  #qrImg { background: #fff; border-radius: 10px; padding: 12px; image-rendering: pixelated; image-rendering: crisp-edges; width: 288px; height: 288px; }
+  #wizQrImg { background: #fff; border-radius: 10px; padding: 12px; image-rendering: pixelated; image-rendering: crisp-edges; width: 288px; height: 288px; }
+  #serverLog { white-space: pre; font-family: "Cascadia Mono", Consolas, monospace; font-size: 9px; line-height: 1; background: #0c0c17; border: 1px solid var(--card-border); border-radius: 6px; padding: 10px; max-width: 100%; overflow: auto; margin: 0; }
+
+  .hero-actions { display: flex; gap: 8px; margin-top: 16px; justify-content: center; flex-wrap: wrap; }
+
+  .offwifi { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--card-border); }
+  .offwifi .folder-row { max-width: 260px; margin: 0 auto; }
+  #pairingCode { letter-spacing: 3px; font-size: 16px; text-align: center; }
+
+  /* ---- Toggle switches ---- */
+  .toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 4px 0; }
+  .toggle-row .toggle-label { font-size: 13px; font-weight: 500; color: var(--text); text-transform: none; letter-spacing: normal; }
+  .switch { position: relative; display: inline-block; width: 38px; height: 22px; flex-shrink: 0; }
+  .switch input { opacity: 0; width: 0; height: 0; }
+  .switch-track { position: absolute; inset: 0; background: #33324f; border-radius: 999px; cursor: pointer; transition: background 0.15s; }
+  .switch-track::before { content: ""; position: absolute; width: 16px; height: 16px; left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: transform 0.15s; }
+  .switch input:checked + .switch-track { background: var(--accent); }
+  .switch input:checked + .switch-track::before { transform: translateX(16px); }
+
+  /* ---- Wizard (first run) ---- */
+  .wizard-steps { display: flex; gap: 6px; margin-bottom: 16px; }
+  .wizard-step { flex: 1; height: 4px; border-radius: 2px; background: var(--card-border); }
+  .wizard-step.done { background: var(--accent); }
+  .wizard-skip { text-align: center; margin-top: 14px; }
+
+  /* ---- Advanced (collapsible) ---- */
+  details.card > summary { cursor: pointer; font-weight: 600; font-size: 12.5px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); list-style: none; }
+  details.card > summary::-webkit-details-marker { display: none; }
+  details.card > summary::before { content: "▸ "; }
+  details.card[open] > summary::before { content: "▾ "; }
+  details.card[open] > summary { margin-bottom: 14px; }
+
+  .dep-item { display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; background: var(--input-bg); border-radius: 6px; margin-bottom: 6px; font-size: 12px; }
   .dep-name { flex: 1; }
-  .dep-version { color: #888; margin-left: 10px; }
-  .dep-status { display: inline-block; padding: 2px 6px; border-radius: 3px; font-size: 10px; font-weight: 600; }
+  .dep-version { color: var(--text-faint); margin-left: 10px; }
+  .dep-status { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 600; }
   .dep-status.installed { background: #1f5c33; color: #b6f2c8; }
   .dep-status.missing { background: #5c1f1f; color: #f2b6b6; }
 </style>
 </head>
 <body>
-  <h1>Expert AI Agent</h1>
-  <p class="sub">Runs the Pi agent on this machine, paired to your Expert AI Chat app. <span id="agentStatusPill" class="status-pill">Checking…</span><span id="statusPill" class="status-pill">Not paired</span></p>
+  <div class="app-header">
+    <img src="../assets/icon.png" alt="" />
+    <div>
+      <h1>Expert AI Agent</h1>
+      <p class="sub">Runs Agent mode locally on this machine, paired to your Expert AI phone app.</p>
+    </div>
+  </div>
 
-  <div class="row">
-    <label>Account</label>
-    <div id="signedOutBox">
+  <!-- First-run wizard: sign in, then pair. Replaced by the dashboard below once
+       a phone has paired for the first time (or the user skips it). -->
+  <section id="wizard" class="card" style="display:none;">
+    <div class="wizard-steps">
+      <div class="wizard-step" id="wizStep1"></div>
+      <div class="wizard-step" id="wizStep2"></div>
+    </div>
+    <div id="wizSignIn">
+      <div class="card-title">Step 1 of 2 — Sign in</div>
       <div class="folder-row">
-        <input id="email" type="text" placeholder="you@example.com" />
-        <button class="primary" id="signIn">Sign in</button>
+        <input id="wizEmail" type="text" placeholder="you@example.com" />
+        <button class="primary" id="wizSignInBtn">Sign in</button>
       </div>
-      <div class="hint" id="authHint"></div>
+      <div class="hint" id="wizAuthHint">Uses the same account as your Expert AI phone app — no new password.</div>
     </div>
-    <div id="signedInBox" style="display:none;">
+    <div id="wizPair" style="display:none;">
+      <div class="card-title">Step 2 of 2 — Pair your phone</div>
+      <div class="qr-wrap visible">
+        <img id="wizQrImg" alt="Pairing QR code" />
+        <div class="hint">Open Expert AI Chat on your phone → Agent mode → Scan QR.</div>
+      </div>
+    </div>
+    <div class="wizard-skip">
+      <button class="subtle" id="wizSkip">Skip for now</button>
+    </div>
+  </section>
+
+  <section id="dashboard" style="display:none;">
+    <!-- Hero: the one thing that matters at a glance -->
+    <div class="card hero">
+      <div class="hero-state">
+        <div class="status-dot" id="statusDot"></div>
+        <p class="hero-title" id="heroTitle">Checking…</p>
+        <p class="hero-sub" id="heroSub"></p>
+        <p class="hero-error-text" id="heroError" style="display:none;"></p>
+      </div>
+
+      <div class="qr-wrap" id="qrWrap">
+        <img id="qrImg" alt="Pairing QR code" />
+        <pre id="serverLog" style="display:none;"></pre>
+        <div class="hint">Scan in Expert AI Chat → Agent mode → Scan QR (same WiFi).</div>
+      </div>
+
+      <div class="hero-actions">
+        <button class="primary" id="generateQr">Generate New QR</button>
+        <button id="restartServer">Restart server</button>
+      </div>
+
+      <div class="offwifi">
+        <div class="hint" style="margin-top:0;margin-bottom:8px;">Off-WiFi fallback code — only needed if your phone can't reach this computer directly.</div>
+        <div class="folder-row">
+          <input id="pairingCode" type="text" readonly />
+          <button id="rotateCode">New code</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <label>Account</label>
+      <div id="signedOutBox">
+        <div class="folder-row">
+          <input id="email" type="text" placeholder="you@example.com" />
+          <button class="primary" id="signIn">Sign in</button>
+        </div>
+        <div class="hint" id="authHint"></div>
+      </div>
+      <div id="signedInBox" style="display:none;">
+        <div class="folder-row">
+          <input id="signedInEmail" type="text" readonly />
+          <button id="signOut">Sign out</button>
+        </div>
+        <div class="hint" id="usageInfo">Loading usage…</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <label>Workspace folder</label>
       <div class="folder-row">
-        <input id="signedInEmail" type="text" readonly />
-        <button id="signOut">Sign out</button>
+        <input id="workdir" type="text" readonly />
+        <button id="pickFolder">Change…</button>
       </div>
-      <div class="hint">Agent mode runs under this account — same plan/quota as Chat mode on your phone.</div>
+      <div class="hint">Agent mode can only read, write, and run commands inside this folder.</div>
     </div>
-  </div>
 
-  <hr />
-
-  <div class="row">
-    <label>Allowed folder</label>
-    <div class="folder-row">
-      <input id="workdir" type="text" readonly />
-      <button id="pickFolder">Change…</button>
+    <div class="card">
+      <label>Preferences</label>
+      <div class="toggle-row">
+        <span class="toggle-label">Start Expert AI Agent when I log in</span>
+        <label class="switch"><input id="autoStart" type="checkbox" /><span class="switch-track"></span></label>
+      </div>
+      <div class="toggle-row">
+        <span class="toggle-label">Auto-run agent actions (no confirm prompts)</span>
+        <label class="switch"><input id="autoRun" type="checkbox" /><span class="switch-track"></span></label>
+      </div>
     </div>
-    <div class="hint">Agent mode can only read/write/run commands inside this folder.</div>
-  </div>
 
-  <div class="row toggle-row">
-    <label for="autoStart">Start Expert AI Agent when Windows starts</label>
-    <input id="autoStart" type="checkbox" />
-  </div>
+    <details class="card">
+      <summary>Advanced</summary>
+      <div style="margin-bottom: 18px;">
+        <div class="card-title">Dependencies</div>
+        <div id="dependenciesList" style="margin-bottom: 8px;"></div>
+        <div class="hint" id="depsHint"></div>
+      </div>
+      <div style="margin-bottom: 18px;">
+        <div class="card-title">Server details</div>
+        <div id="serverStatus" class="hint"></div>
+        <div id="serverCreds" class="hint"></div>
+      </div>
+      <div>
+        <div class="card-title">Troubleshooting</div>
+        <button id="copyDiagnostics" class="subtle" style="padding: 8px 4px;">Copy Diagnostic Report</button>
+        <div class="hint" id="diagnosticsHint">Copies your version, status, and recent logs — paste it when asking for help.</div>
+      </div>
+    </details>
 
-  <div class="row toggle-row">
-    <label for="autoRun">Auto-run agent actions (no confirm prompt)</label>
-    <input id="autoRun" type="checkbox" />
-  </div>
-
-  <hr />
-
-  <div class="row">
-    <label>Dependencies</label>
-    <div id="dependenciesList" style="margin-bottom: 12px;"></div>
-    <div class="hint" id="depsHint" style="margin-top: 8px;"></div>
-  </div>
-
-  <hr />
-
-  <div class="row">
-    <label>Pico server</label>
-    <div id="serverStatus" class="hint"></div>
-    <div id="serverCreds" class="hint"></div>
-    <button id="restartServer" style="margin-top:8px;">Restart server</button>
-  </div>
-
-  <div class="row">
-    <label>Scan this in Expert AI Chat → Agent mode (same WiFi)</label>
-    <pre id="serverLog"></pre>
-    <img id="qrImg" alt="Pairing QR code" />
-    <div class="hint">This is the real Pico pairing QR, printed by the server itself. It refreshes automatically every few minutes — reopen Settings to see the latest one.</div>
-  </div>
-
-  <div class="row">
-    <label>Off-WiFi fallback code</label>
-    <div class="folder-row">
-      <input id="pairingCode" type="text" readonly style="letter-spacing: 3px; font-size: 18px; text-align: center;" />
-      <button id="rotateCode">New code</button>
+    <div class="card" style="text-align:center;">
+      <a href="https://ssv.asia/android-help-center/" id="helpLink" style="color: var(--text-muted); font-size: 12px; text-decoration: none;">Help Center</a>
+      <span style="color: var(--card-border); margin: 0 8px;">·</span>
+      <a href="#" id="contactSupportLink" style="color: var(--text-muted); font-size: 12px; text-decoration: none;">Contact Support</a>
     </div>
-    <div class="hint">Only used automatically if the phone can't reach this computer directly (different network). Not needed on the same WiFi.</div>
-  </div>
+  </section>
 
   <script src="settings.js"></script>
 </body>
