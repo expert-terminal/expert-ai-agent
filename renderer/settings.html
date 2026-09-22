@@ -212,6 +212,16 @@
     </div>
 
     <div class="card">
+      <label>Mobile durable job handoff</label>
+      <div class="folder-row">
+        <input id="handoffJobId" type="text" placeholder="Job ID from Expert AI mobile" />
+        <input id="handoffToken" type="password" placeholder="Five-minute invitation" />
+        <button id="consumeHandoff">Import</button>
+      </div>
+      <div class="hint" id="handoffStatus">Import a mobile job to inspect its durable status. Execution remains on the gateway until the local-agent bridge is enabled.</div>
+    </div>
+
+    <div class="card">
       <label>Preferences</label>
       <div class="toggle-row">
         <span class="toggle-label">Start Expert AI Agent when I log in</span>

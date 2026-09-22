@@ -16,13 +16,13 @@ const WORKER_URL = WORKER_HOSTS[0];
 const POLL_INTERVAL_MS = 3000;
 const POLL_TIMEOUT_MS = 5 * 60 * 1000;
 
-async function api(method, path, body) {
+async function api(method, path, body, extraHeaders = {}) {
   let lastErr;
   for (const host of WORKER_HOSTS) {
     try {
       const r = await fetch(`${host}${path}`, {
         method,
-        headers: { 'content-type': 'application/json' },
+        headers: { 'content-type': 'application/json', ...extraHeaders },
         body: body ? JSON.stringify(body) : undefined,
       });
       let data = {};
@@ -33,6 +33,15 @@ async function api(method, path, body) {
     }
   }
   throw lastErr || new Error('Network request failed');
+}
+
+async function consumeJobHandoff(session, jobId, invitationToken) {
+  if (!isSessionValid(session)) throw new Error('Sign in to the same Expert AI account first.');
+  const handoff = await api('POST', '/v1/chat/jobs/handoff/consume', { jobId, token: invitationToken }, { Authorization: `Bearer ${session.token}` });
+  if (!handoff.ok) throw new Error(handoff.data?.error?.message || handoff.data?.error || 'Could not consume the handoff invitation.');
+  const state = await api('GET', `/v1/chat/jobs?jobId=${encodeURIComponent(jobId)}`, undefined, { Authorization: `Bearer ${session.token}` });
+  if (!state.ok) throw new Error('Handoff accepted, but the durable job state could not be loaded.');
+  return { handoff: handoff.data, state: state.data };
 }
 
 /** Starts device login for `email`, opens the Ghost verify page, and polls until the
@@ -66,4 +75,4 @@ function isSessionValid(session) {
   return !!(session && session.token && session.sessionExpires && session.sessionExpires > Math.floor(Date.now() / 1000));
 }
 
-module.exports = { deviceLogin, isSessionValid, WORKER_URL };
+module.exports = { consumeJobHandoff, deviceLogin, isSessionValid, WORKER_URL };

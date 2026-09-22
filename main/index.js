@@ -3,7 +3,7 @@ const path = require('node:path');
 const fs = require('node:fs');
 const { Store } = require('./store');
 const { RelayClient } = require('./relay');
-const { deviceLogin, isSessionValid } = require('./auth');
+const { consumeJobHandoff, deviceLogin, isSessionValid } = require('./auth');
 const { PiServerManager, PI_SERVER_PORT, resourcesRoot } = require('./pi-server');
 const QRCode = require('qrcode');
 const logger = require('./logger');
@@ -293,6 +293,15 @@ ipcMain.handle('auth:signOut', () => {
     console.error('pi-server restart after sign-out failed:', err),
   );
   return { ok: true };
+});
+
+ipcMain.handle('handoff:consume', async (_event, jobId, invitationToken) => {
+  try {
+    const result = await consumeJobHandoff(store.get('session'), jobId, invitationToken);
+    return { ok: true, ...result };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : String(error) };
+  }
 });
 
 ipcMain.handle('pi-server:get', async () => {

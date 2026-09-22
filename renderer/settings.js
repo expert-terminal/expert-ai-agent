@@ -276,6 +276,25 @@ function formatUsageText(balance) {
     renderSession(null);
   });
 
+  document.getElementById('consumeHandoff').addEventListener('click', async () => {
+    const status = document.getElementById('handoffStatus');
+    const jobId = document.getElementById('handoffJobId').value.trim();
+    const token = document.getElementById('handoffToken').value.trim();
+    if (!jobId || !token) {
+      status.textContent = 'Enter both the mobile job ID and invitation.';
+      return;
+    }
+    status.textContent = 'Validating invitation…';
+    const result = await window.expertAgent.consumeJobHandoff(jobId, token);
+    if (!result.ok) {
+      status.textContent = `Handoff unavailable: ${result.error}`;
+      return;
+    }
+    const state = result.state || {};
+    status.textContent = `Imported ${state.status || 'unknown'} job · ${state.text ? `${state.text.length} response characters available` : 'no response text yet'}. Local-agent continuation is not enabled yet.`;
+    document.getElementById('handoffToken').value = '';
+  });
+
   // Dependencies checker (read-only, bundled during build)
   async function checkDependencies() {
     const depsListEl = document.getElementById('dependenciesList');
