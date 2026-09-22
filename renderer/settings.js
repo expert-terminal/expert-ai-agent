@@ -292,7 +292,19 @@ function formatUsageText(balance) {
     }
     const state = result.state || {};
     status.textContent = `Imported ${state.status || 'unknown'} job · ${state.text ? `${state.text.length} response characters available` : 'no response text yet'}. Local-agent continuation is not enabled yet.`;
+    const copyButton = document.getElementById('copyHandoffResponse');
+    copyButton.style.display = state.text ? '' : 'none';
+    copyButton.dataset.response = state.text || '';
     document.getElementById('handoffToken').value = '';
+  });
+
+  document.getElementById('copyHandoffResponse').addEventListener('click', async (event) => {
+    const button = event.currentTarget;
+    const text = button.dataset.response || '';
+    if (!text) return;
+    await navigator.clipboard.writeText(text);
+    button.textContent = 'Copied imported response';
+    setTimeout(() => { button.textContent = 'Copy imported response'; }, 1800);
   });
 
   // Dependencies checker (read-only, bundled during build)
