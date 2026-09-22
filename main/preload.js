@@ -10,6 +10,7 @@ contextBridge.exposeInMainWorld('expertAgent', {
   signIn: (email) => ipcRenderer.invoke('auth:signIn', email),
   signOut: () => ipcRenderer.invoke('auth:signOut'),
   consumeJobHandoff: (jobId, invitationToken) => ipcRenderer.invoke('handoff:consume', jobId, invitationToken),
+  continueJobHandoff: (jobId, state, sessionId, instruction) => ipcRenderer.invoke('handoff:continue', jobId, state, sessionId, instruction),
   getPiServer: () => ipcRenderer.invoke('pi-server:get'),
   restartPiServer: () => ipcRenderer.invoke('pi-server:restart'),
   stopPiServer: () => ipcRenderer.invoke('pi-server:stop'),

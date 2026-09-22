@@ -35,6 +35,13 @@ async function api(method, path, body, extraHeaders = {}) {
   throw lastErr || new Error('Network request failed');
 }
 
+async function localApi(method, path, body, extraHeaders = {}) {
+  const r = await fetch(`http://127.0.0.1:5454${path}`, { method, headers: { 'content-type': 'application/json', ...extraHeaders }, body: body ? JSON.stringify(body) : undefined });
+  let data = {};
+  try { data = await r.json(); } catch { /* non-JSON error body */ }
+  return { ok: r.ok, status: r.status, data };
+}
+
 async function consumeJobHandoff(session, jobId, invitationToken) {
   if (!isSessionValid(session)) throw new Error('Sign in to the same Expert AI account first.');
   const handoff = await api('POST', '/v1/chat/jobs/handoff/consume', { jobId, token: invitationToken }, { Authorization: `Bearer ${session.token}` });
@@ -42,6 +49,15 @@ async function consumeJobHandoff(session, jobId, invitationToken) {
   const state = await api('GET', `/v1/chat/jobs?jobId=${encodeURIComponent(jobId)}`, undefined, { Authorization: `Bearer ${session.token}` });
   if (!state.ok) throw new Error('Handoff accepted, but the durable job state could not be loaded.');
   return { handoff: handoff.data, state: state.data };
+}
+
+async function continueJobHandoff(session, jobId, state, sessionId, instruction) {
+  if (!isSessionValid(session)) throw new Error('Sign in to the same Expert AI account first.');
+  if (!sessionId || !instruction) throw new Error('A local agent session and continuation instruction are required.');
+  const message = [`Continue imported durable job ${jobId}.`, 'Prior gateway result:', state?.text || '(no completed response yet)', 'Continuation instruction:', instruction].join('\n\n');
+  const result = await localApi('POST', '/api/agent/prompt', { session_id: sessionId, message, streaming_behavior: 'steer' }, { Authorization: `Bearer ${session.token}` });
+  if (!result.ok) throw new Error(result.data?.error?.message || result.data?.error || 'Local agent rejected the continuation.');
+  return result.data;
 }
 
 /** Starts device login for `email`, opens the Ghost verify page, and polls until the
@@ -75,4 +91,4 @@ function isSessionValid(session) {
   return !!(session && session.token && session.sessionExpires && session.sessionExpires > Math.floor(Date.now() / 1000));
 }
 
-module.exports = { consumeJobHandoff, deviceLogin, isSessionValid, WORKER_URL };
+module.exports = { consumeJobHandoff, continueJobHandoff, deviceLogin, isSessionValid, WORKER_URL };

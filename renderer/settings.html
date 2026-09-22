@@ -218,7 +218,12 @@
         <input id="handoffToken" type="password" placeholder="Five-minute invitation" />
         <button id="consumeHandoff">Import</button>
       </div>
-      <div class="hint" id="handoffStatus">Import a mobile job to inspect its durable status. Execution remains on the gateway until the local-agent bridge is enabled.</div>
+      <div class="folder-row" style="margin-top:8px">
+        <input id="handoffSessionId" type="text" placeholder="Local agent session ID" />
+        <input id="handoffInstruction" type="text" placeholder="Continue with…" />
+        <button id="continueHandoff" disabled>Continue locally</button>
+      </div>
+      <div class="hint" id="handoffStatus">Import a mobile job, then provide a local agent session ID to continue it through the existing Pi API.</div>
       <button id="copyHandoffResponse" class="subtle" style="display:none; margin-top:8px;">Copy imported response</button>
     </div>
 

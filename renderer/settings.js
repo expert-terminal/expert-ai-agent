@@ -291,11 +291,27 @@ function formatUsageText(balance) {
       return;
     }
     const state = result.state || {};
-    status.textContent = `Imported ${state.status || 'unknown'} job · ${state.text ? `${state.text.length} response characters available` : 'no response text yet'}. Local-agent continuation is not enabled yet.`;
+    status.textContent = `Imported ${state.status || 'unknown'} job · ${state.text ? `${state.text.length} response characters available` : 'no response text yet'}.`;
+    document.getElementById('continueHandoff').disabled = false;
+    document.getElementById('continueHandoff').dataset.state = JSON.stringify(state);
     const copyButton = document.getElementById('copyHandoffResponse');
     copyButton.style.display = state.text ? '' : 'none';
     copyButton.dataset.response = state.text || '';
     document.getElementById('handoffToken').value = '';
+  });
+
+  document.getElementById('continueHandoff').addEventListener('click', async (event) => {
+    const button = event.currentTarget;
+    const status = document.getElementById('handoffStatus');
+    const jobId = document.getElementById('handoffJobId').value.trim();
+    const sessionId = document.getElementById('handoffSessionId').value.trim();
+    const instruction = document.getElementById('handoffInstruction').value.trim();
+    if (!jobId || !sessionId || !instruction) { status.textContent = 'Enter the job ID, local session ID, and continuation instruction.'; return; }
+    status.textContent = 'Sending continuation to the local agent…';
+    button.disabled = true;
+    const result = await window.expertAgent.continueJobHandoff(jobId, JSON.parse(button.dataset.state || '{}'), sessionId, instruction);
+    status.textContent = result.ok ? 'Continuation accepted by the local agent.' : `Local continuation failed: ${result.error}`;
+    button.disabled = false;
   });
 
   document.getElementById('copyHandoffResponse').addEventListener('click', async (event) => {
