@@ -189,9 +189,9 @@ const OBSIDIAN_SYSTEM_PROMPT =
   "you will do and wait for confirmation. If the user only says hi, briefly say you have read/write/command " +
   "access to their vault folder and understand Obsidian's format, then ask what they want -- two sentences, no menu.";
 
-/** Writes ~/.pi/agent/models.json with the Expert AI router and its deliberate
- *  model choices. The mobile/web client filters direct choices against the
- *  account's live /balance; the gateway remains the final quota authority.
+/** Writes ~/.pi/agent/models.json with the Expert AI router and the direct
+ *  choices still available to this desktop's signed-in gateway account.
+ *  The gateway remains the final quota authority.
  *  the gateway, authenticated with the SAME session token the tray app signed in
  *  with (main/auth.js) — before it ever starts. No "Custom Models" screen, no API
  *  key the user has to find or paste; this is what makes Agent mode "pay and use"
@@ -199,9 +199,32 @@ const OBSIDIAN_SYSTEM_PROMPT =
  *  session changes (see index.js's auth:signIn handler) so a fresh token always
  *  takes effect without the user doing anything.
  *  Format: docs/models.md in the bundled pi-coding-agent package. */
-function writeModelsJson(session) {
+async function availableGatewayModels(session) {
+  if (!session?.token) return [];
+  try {
+    const response = await fetch(`${GATEWAY_URL}/balance`, {
+      headers: { Authorization: `Bearer ${session.token}` },
+      signal: AbortSignal.timeout(1200),
+    });
+    if (!response.ok) return [];
+    const balance = await response.json();
+    const budgets = balance.budgets || {};
+    const used = balance.used || {};
+    return [
+      { id: 'expert-ai/claude-haiku', name: 'Claude Haiku 5.5', pool: 'haiku' },
+      { id: 'expert-ai/claude-sonnet', name: 'Claude Sonnet 5.5', pool: 'sonnet' },
+      { id: 'expert-ai/gpt-luna', name: 'GPT-6 Luna', pool: 'luna' },
+    ].filter(({ pool }) => Number(budgets[pool] || 0) > Number(used[pool] || 0));
+  } catch {
+    // Expert AI's automatic router remains usable during account API outages.
+    return [];
+  }
+}
+
+async function writeModelsJson(session) {
   const modelsPath = modelsJsonPath();
   fs.mkdirSync(path.dirname(modelsPath), { recursive: true });
+  const directModels = await availableGatewayModels(session);
 
   const baseProviders = session?.token
     ? {
@@ -242,11 +265,7 @@ function writeModelsJson(session) {
                 maxTokensField: 'max_tokens',
               },
             },
-            ...[
-              { id: 'expert-ai/claude-haiku', name: 'Claude Haiku 5.5' },
-              { id: 'expert-ai/claude-sonnet', name: 'Claude Sonnet 5.5' },
-              { id: 'expert-ai/gpt-luna', name: 'GPT-6 Luna' },
-            ].map(({ id, name }) => ({
+            ...directModels.map(({ id, name }) => ({
               id, name, reasoning: false, input: ['text'], contextWindow: 128000,
               maxTokens: 8192,
               cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
@@ -302,7 +321,7 @@ async function ensureConfig(workdir, relayUrl, session) {
     fs.writeFileSync(p.credentials, JSON.stringify(creds, null, 2), { mode: 0o600 });
   }
 
-  writeModelsJson(session);
+  await writeModelsJson(session);
 
   // ── Full-replacement escape hatch ─────────────────────────────────────────
   // If config.custom.toml exists and looks structurally sane, use it verbatim —
