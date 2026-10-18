@@ -40,7 +40,7 @@ let notifiedPairedThisRun = false;
 // tick (see pi-server:get). Keyed on the exact connect URL it was built from.
 let qrCache = { url: null, dataUrl: null };
 
-const ICON_PATH = path.join(__dirname, '..', 'assets', process.platform === 'win32' ? 'icon.ico' : 'icon.png');
+const ICON_PATH = path.join(__dirname, '..', 'assets', process.platform === 'win32' ? 'expert-ai-owl-transparent.ico' : 'expert-ai-owl-transparent.png');
 const ICON_EXT = process.platform === 'win32' ? 'ico' : 'png';
 // Color-coded tray icon variants (see assets/*.{ico,png}) so connection state is
 // visible at a glance without opening Settings — grey/plain = not running, amber =

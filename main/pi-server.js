@@ -204,7 +204,9 @@ async function availableGatewayModels(session) {
   try {
     const response = await fetch(`${GATEWAY_URL}/balance`, {
       headers: { Authorization: `Bearer ${session.token}` },
-      signal: AbortSignal.timeout(1200),
+      // Cold Cloudflare routes can exceed 1.2 s after login. A short bounded
+      // retry window avoids silently publishing only the automatic router.
+      signal: AbortSignal.timeout(3500),
     });
     if (!response.ok) return [];
     const balance = await response.json();

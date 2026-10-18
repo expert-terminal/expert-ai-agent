@@ -63,7 +63,7 @@
           ]
         }
       ],
-      "icon": "assets/icon.ico"
+      "icon": "assets/expert-ai-owl-transparent.ico"
     },
     "nsis": {
       "oneClick": true,
@@ -81,7 +81,7 @@
           ]
         }
       ],
-      "icon": "assets/icon.png",
+      "icon": "assets/expert-ai-owl-transparent.png",
       "category": "public.app-category.productivity",
       "extendInfo": {
         "NSLocalNetworkUsageDescription": "Expert AI Agent runs a local server so your paired phone can connect."
@@ -96,7 +96,7 @@
           ]
         }
       ],
-      "icon": "assets/icon.png",
+      "icon": "assets/expert-ai-owl-transparent.png",
       "category": "Utility"
     }
   }
