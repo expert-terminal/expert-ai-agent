@@ -230,7 +230,15 @@ function writeModelsJson(session) {
               // field). OpenRouter's actual API expects `reasoning: { effort }`, not
               // `reasoning_effort`, so without this override the field pi-ai sends
               // would be silently ignored by OpenRouter entirely.
-              compat: { thinkingFormat: 'openrouter' },
+              // Our gateway accepts OpenAI chat roles except `developer`.
+              // pi-ai otherwise infers developer-role support for this custom
+              // provider when reasoning is enabled, and the first greeting is
+              // rejected by the gateway as a malformed request.
+              compat: {
+                thinkingFormat: 'openrouter',
+                supportsDeveloperRole: false,
+                maxTokensField: 'max_tokens',
+              },
             },
           ],
         },
@@ -441,9 +449,10 @@ async function ensurePortFree(port) {
 const RETRY_DELAYS_MS = [5000, 10000, 20000, 40000, 60000];
 
 class PiServerManager {
-  constructor({ store, onStatusChange }) {
+  constructor({ store, onStatusChange, onPaired }) {
     this.store = store;
     this.onStatusChange = onStatusChange || (() => {});
+    this.onPaired = onPaired || (() => {});
     this.child = null;
     this.status = 'stopped';
     this.log = '';
@@ -462,6 +471,7 @@ class PiServerManager {
     this._pairArmTimer = null;
     this._pendingYs = 0;     // approx count of unconsumed "y\n" we've buffered (bounded top-up)
     this._armed = false;
+    this._inviteAccessToken = null;
   }
 
   /** `session` is optional — omit it to keep whatever was last passed (so an
@@ -495,6 +505,7 @@ class PiServerManager {
     this._stdoutTail = '';
     this._pendingYs = 0;
     this._armed = false;
+    this._inviteAccessToken = null;
     this._stopPairingArm();
 
     // Ensure binary has execute permissions (macOS/Linux)
@@ -736,6 +747,7 @@ class PiServerManager {
       this._pendingYs = 0;
       this._stdoutTail = '';
       this._writeY();
+      this.onPaired();
       return;
     }
 
@@ -773,6 +785,40 @@ class PiServerManager {
   getConnectUrl() {
     const matches = this.log.match(/pi:\/\/connect\?\S+/g);
     return matches && matches.length ? matches[matches.length - 1] : null;
+  }
+
+  async getFreshConnectUrl() {
+    const existing = this.getConnectUrl();
+    const fallback = this.paired ? null : existing;
+    if (!existing || !this.child || this.status !== 'running') return fallback;
+    const creds = this.getCredentials();
+    if (!creds?.username || !creds?.password) return fallback;
+    try {
+      if (!this._inviteAccessToken) {
+        const login = await fetch(`http://127.0.0.1:${PI_SERVER_PORT}/api/auth/login`, {
+          method: 'POST', headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ username: creds.username, password: creds.password }),
+          signal: AbortSignal.timeout(2500),
+        });
+        if (!login.ok) return fallback;
+        this._inviteAccessToken = (await login.json())?.data?.access_token;
+      }
+      if (!this._inviteAccessToken) return fallback;
+      const response = await fetch(`http://127.0.0.1:${PI_SERVER_PORT}/api/auth/invite`, {
+        method: 'POST', headers: { authorization: `Bearer ${this._inviteAccessToken}` },
+        signal: AbortSignal.timeout(2500),
+      });
+      if (response.status === 401) this._inviteAccessToken = null;
+      if (!response.ok) return fallback;
+      const invite = (await response.json())?.data;
+      if (!invite?.qr_id || !invite?.server_id) return fallback;
+      const parsed = new URL(existing.replace(/^pi:\/\//, 'https://pi.local/'));
+      parsed.searchParams.set('qr_id', invite.qr_id);
+      parsed.searchParams.set('server_id', invite.server_id);
+      return 'pi://' + parsed.href.slice('https://pi.local/'.length);
+    } catch {
+      return fallback;
+    }
   }
 
   getLastError() {

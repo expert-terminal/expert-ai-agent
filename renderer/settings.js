@@ -66,6 +66,7 @@ function formatUsageText(balance) {
   let currentSession = null;
   let currentPiServerStatus = 'stopped';
   let currentPiServerPaired = false;
+  let showAdditionalQr = false;
   let setupDone = !!settings.hasCompletedSetup;
   let lastPairedAt = settings.lastPairedAt || null;
 
@@ -131,7 +132,7 @@ function formatUsageText(balance) {
     } else if (!currentPiServerPaired) {
       dotClass = 'waiting';
       title = 'Waiting for your phone';
-      sub = 'Scan the QR below in Expert AI Chat → Agent mode.';
+      sub = 'Your computer appears automatically in Expert AI on the same account. Scan the QR if needed.';
       showQr = true;
       generateQrBtn.textContent = 'Generate New QR';
     } else {
@@ -141,6 +142,7 @@ function formatUsageText(balance) {
         ? `Ready to use — connected at ${new Date(lastPairedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`
         : 'Agent mode is ready to use on your phone.';
       generateQrBtn.textContent = 'Pair Another Device';
+      showQr = showAdditionalQr;
     }
 
     statusDot.className = 'status-dot' + (dotClass ? ' ' + dotClass : '');
@@ -230,8 +232,7 @@ function formatUsageText(balance) {
   setInterval(refreshPiServer, 5000);
 
   document.getElementById('generateQr').addEventListener('click', async () => {
-    heroTitle.textContent = 'Restarting…';
-    await window.expertAgent.restartPiServer();
+    showAdditionalQr = true;
     refreshPiServer();
   });
   document.getElementById('restartServer').addEventListener('click', async () => {

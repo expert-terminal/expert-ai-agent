@@ -1,0 +1,32 @@
+name: Windows test build
+
+on:
+  push:
+    branches: [main, 'codex/**']
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.23.2
+          cache: npm
+      - run: npm ci
+      - run: node --check main/index.js
+      - run: node --check main/pi-server.js
+      - run: node --check main/device-discovery.js
+      - run: node scripts/setup-binaries.js
+      - run: npx electron-builder --win --publish=never
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: expert-ai-agent-windows
+          path: dist/Expert AI Agent-*-x64.exe
+          retention-days: 7

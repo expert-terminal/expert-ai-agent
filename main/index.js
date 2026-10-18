@@ -5,6 +5,7 @@ const { Store } = require('./store');
 const { RelayClient } = require('./relay');
 const { consumeJobHandoff, continueJobHandoff, deviceLogin, isSessionValid } = require('./auth');
 const { PiServerManager, PI_SERVER_PORT, resourcesRoot } = require('./pi-server');
+const { publishDevice, removeDevice } = require('./device-discovery');
 const QRCode = require('qrcode');
 const logger = require('./logger');
 
@@ -22,6 +23,14 @@ let relayClient = null;
 let relayStatus = 'disconnected'; // 'disconnected' | 'connecting' | 'connected' | 'paired'
 let piServer = null;
 let piServerStatus = 'stopped'; // 'stopped' | 'starting' | 'running'
+let discoveryBusy = false;
+async function refreshDiscovery() {
+  if (discoveryBusy || !store || !relayClient?.isReady?.() || piServerStatus !== 'running') return;
+  discoveryBusy = true;
+  try { await publishDevice(store, async () => (await getPiServerState()).connectUrl); }
+  catch (err) { console.warn('[discovery]', err.message); }
+  finally { discoveryBusy = false; }
+}
 // Tracks whether we've already fired the "Connected" notification for the CURRENT
 // pairing — reset to false on every server restart (piServer.start() always resets
 // its own `paired` flag too), so reconnecting after a restart notifies again, but a
@@ -101,7 +110,7 @@ function buildTrayMenu() {
     // qr_id/QR every launch (see pi-server.js) — the same mechanism as
     // Settings' "Restart server" button, exposed here for one-click access
     // without opening the Settings window first.
-    { label: 'Generate New QR', click: () => startServer(), enabled: serverRunning },
+    { label: 'Pair another device…', click: () => createSettingsWindow(), enabled: serverRunning },
     { type: 'separator' },
     { label: 'Quit', click: () => app.quit() },
   ]);
@@ -135,6 +144,7 @@ function refreshTray() {
   // gets confirmation without ever needing to open Settings to check.
   if (paired && !notifiedPairedThisRun) {
     notifiedPairedThisRun = true;
+    setTimeout(refreshDiscovery, 2000);
     store?.set('lastPairedAt', Date.now());
     if (settingsWindow) settingsWindow.webContents.send('pi-server:paired');
     if (Notification.isSupported()) {
@@ -196,6 +206,8 @@ app.whenReady().then(() => {
     onStatusChange: (status) => {
       relayStatus = status;
       refreshTray();
+      if (status === 'connected' || status === 'paired') refreshDiscovery();
+      if (status === 'connected') setTimeout(refreshDiscovery, 3000);
       if (settingsWindow) settingsWindow.webContents.send('relay:status', status);
     },
   });
@@ -203,9 +215,11 @@ app.whenReady().then(() => {
 
   piServer = new PiServerManager({
     store,
+    onPaired: () => setTimeout(refreshDiscovery, 1500),
     onStatusChange: (status) => {
       piServerStatus = status;
       refreshTray();
+      if (status === 'running') refreshDiscovery();
       if (settingsWindow) settingsWindow.webContents.send('pi-server:status', status);
       if (status === 'error') logger.log('ERROR', 'pi-server entered error state:', piServer?.getLastError());
     },
@@ -221,6 +235,9 @@ app.whenReady().then(() => {
     logger.log('ERROR', 'pi-server failed to start:', err?.stack || err?.message || String(err));
     refreshTray();
   });
+  // Keep account discovery current without involving the QR renderer or the
+  // agent chat path. A short-lived gateway record disappears if this tray exits.
+  setInterval(refreshDiscovery, 30000);
 });
 
 app.on('before-quit', () => {
@@ -288,6 +305,7 @@ ipcMain.handle('auth:signIn', async (_event, email) => {
 });
 
 ipcMain.handle('auth:signOut', () => {
+  removeDevice(store, store.get('session')).catch(() => {});
   store.set('session', null);
   piServer?.start(relayClient?.getTunnelUrl(), null).catch((err) =>
     console.error('pi-server restart after sign-out failed:', err),
@@ -309,8 +327,8 @@ ipcMain.handle('handoff:continue', async (_event, jobId, state, sessionId, instr
   catch (error) { return { ok: false, error: error instanceof Error ? error.message : String(error) }; }
 });
 
-ipcMain.handle('pi-server:get', async () => {
-  let connectUrl = piServer?.getConnectUrl() ?? null;
+async function getPiServerState() {
+  let connectUrl = await piServer?.getFreshConnectUrl() ?? null;
   const relayReady = relayClient?.isReady?.() ?? false;
   let lanCount = 0;
   // ── Relay-primary QR ─────────────────────────────────────────────────────────
@@ -440,7 +458,8 @@ ipcMain.handle('pi-server:get', async () => {
     // lets Settings show "connecting…" instead of a blank/again-failing QR.
     pairingPending: !connectUrl && (piServerStatus === 'running' || piServerStatus === 'starting'),
   };
-});
+}
+ipcMain.handle('pi-server:get', getPiServerState);
 
 ipcMain.handle('pi-server:restart', async () => {
   await startServer();
