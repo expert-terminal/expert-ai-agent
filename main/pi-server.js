@@ -189,7 +189,9 @@ const OBSIDIAN_SYSTEM_PROMPT =
   "you will do and wait for confirmation. If the user only says hi, briefly say you have read/write/command " +
   "access to their vault folder and understand Obsidian's format, then ask what they want -- two sentences, no menu.";
 
-/** Writes ~/.pi/agent/models.json so the `pi` CLI has exactly one usable model —
+/** Writes ~/.pi/agent/models.json with the Expert AI router and its deliberate
+ *  model choices. The mobile/web client filters direct choices against the
+ *  account's live /balance; the gateway remains the final quota authority.
  *  the gateway, authenticated with the SAME session token the tray app signed in
  *  with (main/auth.js) — before it ever starts. No "Custom Models" screen, no API
  *  key the user has to find or paste; this is what makes Agent mode "pay and use"
@@ -240,6 +242,16 @@ function writeModelsJson(session) {
                 maxTokensField: 'max_tokens',
               },
             },
+            ...[
+              { id: 'expert-ai/claude-haiku', name: 'Claude Haiku 5.5' },
+              { id: 'expert-ai/claude-sonnet', name: 'Claude Sonnet 5.5' },
+              { id: 'expert-ai/gpt-luna', name: 'GPT-6 Luna' },
+            ].map(({ id, name }) => ({
+              id, name, reasoning: false, input: ['text'], contextWindow: 128000,
+              maxTokens: 8192,
+              cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+              compat: { supportsDeveloperRole: false, maxTokensField: 'max_tokens' },
+            })),
           ],
         },
       }
