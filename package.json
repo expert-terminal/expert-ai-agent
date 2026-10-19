@@ -1,6 +1,6 @@
 {
   "name": "expert-ai-agent",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "Expert AI Agent - lightweight tray app that pairs this machine with the Expert AI Chat phone app and runs the Pi agent locally, relayed over Cloudflare.",
   "main": "main/index.js",
   "type": "commonjs",
@@ -15,7 +15,8 @@
     "build:win": "set ELECTRON_BUILDER_COMPRESSION_LEVEL=5 && npm ci && node scripts/setup-binaries.js && electron-builder --win --publish=never",
     "build:mac": "npm ci && node scripts/setup-binaries.js && electron-builder --mac --publish=never",
     "build:store": "npm ci && node scripts/setup-binaries.js && node scripts/build-store-package.js",
-    "build:linux": "npm ci && node scripts/setup-binaries.js && electron-builder --linux --publish=never"
+    "build:linux": "npm ci && node scripts/setup-binaries.js && electron-builder --linux --publish=never",
+    "test": "node --test test/tunnel-timeout.test.js"
   },
   "dependencies": {
     "qrcode": "^1.5.4",

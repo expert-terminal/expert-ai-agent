@@ -8,6 +8,7 @@
 const WebSocket = require('ws');
 const crypto = require('node:crypto');
 const { PI_SERVER_PORT } = require('./pi-server');
+const { tunnelFetchTimeoutMs } = require('./tunnel-timeout');
 
 const RELAY_BASE = 'link.ssv.asia'; // custom domain (verified 2026-08-29); was expert-ai-link.arthouse.workers.dev
 const RELAY_WS_URL = `wss://${RELAY_BASE}/pair/ws`;
@@ -48,10 +49,8 @@ const REG_STALE_MS = 25000;
 const REG_HEALTH_PATH = '/__relay_health';
 
 // Cap on how long we wait for the local pi-server to answer a tunneled request.
-// The phone's own pairing call times out around 4s; a hung fetch here (pi-server
-// mid-restart, port not yet bound) must not pin the tunnel open past that.
-const TUNNEL_FETCH_TIMEOUT_MS = 10000;
-
+// Session lifecycle requests use a Windows-specific longer cap because Pi RPC
+// startup itself is allowed 30 seconds; see ./tunnel-timeout.
 function generatePairingCode() {
   // 8 chars, unambiguous alphabet (no 0/O/1/I). Always uppercase so the code that
   // goes into the QR and the code the relay registers under can never differ by case.
@@ -357,7 +356,7 @@ class RelayClient {
     // the moment headers arrive, so a long-lived SSE stream is NOT killed by it.
     const doFetch = async () => {
       const ac = new AbortController();
-      const timer = setTimeout(() => ac.abort(), TUNNEL_FETCH_TIMEOUT_MS);
+      const timer = setTimeout(() => ac.abort(), tunnelFetchTimeoutMs(msg.path));
       try {
         return await fetch(url, { method: msg.method, headers, body: reqBody, signal: ac.signal });
       } finally {

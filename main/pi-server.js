@@ -13,6 +13,7 @@ const os = require('node:os');
 const net = require('node:net');
 
 const PI_SERVER_PORT = 5454;
+const LOCAL_STORE_RUNTIME_HOTFIX_MARKER = '# expert-ai-agent-store-runtime-hotfix:v1';
 
 // The whole point of a white-labeled tray app: nobody who installs it should ever
 // need Node.js, npm, or a hand-configured API key already on their machine. A full
@@ -367,13 +368,23 @@ async function ensureConfig(workdir, relayUrl, session) {
   // server silently; anything past that is the operator's call.
   try {
     if (fs.existsSync(p.customConfig)) {
-      const custom = fs.readFileSync(p.customConfig, 'utf-8');
-      if (/\[\s*server\s*\]/.test(custom) && /password_hash\s*=/.test(custom)) {
+      const custom = fs.readFileSync(p.customConfig, 'utf-8').replace(/^\uFEFF/, '');
+      // A one-machine recovery shim created for Store package 0.1.5 pointed into
+      // its versioned WindowsApps directory. Once this build has the direct Node
+      // + CLI path, discard only that explicitly marked shim and regenerate paths
+      // against the newly installed package. All user-authored custom configs are
+      // still preserved and applied verbatim.
+      if (custom.startsWith(LOCAL_STORE_RUNTIME_HOTFIX_MARKER)) {
+        try { fs.unlinkSync(p.customConfig); } catch (err) {
+          console.warn(`[pi-server] could not remove migrated Store runtime hotfix: ${err.message}`);
+        }
+      } else if (/\[\s*server\s*\]/.test(custom) && /password_hash\s*=/.test(custom)) {
         fs.writeFileSync(p.config, custom, 'utf-8');
         console.log('[pi-server] using operator config.custom.toml verbatim');
         return { ...p, creds };
+      } else {
+        console.warn('[pi-server] config.custom.toml missing [server]/password_hash — ignoring it');
       }
-      console.warn('[pi-server] config.custom.toml missing [server]/password_hash — ignoring it');
     }
   } catch (err) {
     console.warn(`[pi-server] could not read config.custom.toml: ${err.message}`);
@@ -393,7 +404,7 @@ async function ensureConfig(workdir, relayUrl, session) {
   const packageName =
     typeof knobs.packageName === 'string' && knobs.packageName.trim()
       ? knobs.packageName.trim()
-      : '@mariozechner/pi-coding-agent';
+      : '@earendil-works/pi-coding-agent';
 
   const chatLines = [`cwd = ${JSON.stringify(workdir)}`, `no_tools = ${noTools}`];
   if (systemPrompt !== '') chatLines.push(`system_prompt = ${JSON.stringify(systemPrompt)}`);
@@ -416,6 +427,7 @@ ${chatLines.join('\n')}
 [paths]
 node = ${JSON.stringify(bundledNodeBinary())}
 pi = ${JSON.stringify(bundledPiBinary())}
+${process.platform === 'win32' ? `pi_cli = ${JSON.stringify(path.join(resourcesRoot(), 'node_modules', '@earendil-works', 'pi-coding-agent', 'dist', 'cli.js'))}\n` : ''}
 
 [agent]
 # Default []: pi-coding-agent's own default ("npm:@anthaathi/pi-companion-extensions")
