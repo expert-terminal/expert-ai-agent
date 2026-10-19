@@ -100,10 +100,10 @@ jobs:
           chmod +x resources/pi-node/node resources/pi-node/pi resources/pi-server resources/pi-server-x64
           file resources/pi-node/node
           "resources/pi-node/node" --version
-          lipo -verify_arch arm64 resources/pi-node/node
-          lipo -verify_arch x86_64 resources/pi-node/node
-          lipo -verify_arch arm64 resources/pi-server
-          lipo -verify_arch x86_64 resources/pi-server-x64
+          lipo resources/pi-node/node -verify_arch arm64
+          lipo resources/pi-node/node -verify_arch x86_64
+          lipo resources/pi-server -verify_arch arm64
+          lipo resources/pi-server-x64 -verify_arch x86_64
           test -x resources/pi-node/pi
           test -x resources/pi-server
           test -x resources/pi-server-x64
