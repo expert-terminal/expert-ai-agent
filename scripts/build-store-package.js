@@ -23,7 +23,7 @@ const config = {
   ...packageJson.build,
   directories: {
     ...packageJson.build.directories,
-    output: 'dist/store',
+    output: process.env.STORE_OUTPUT_DIR || 'dist/store',
   },
   win: {
     ...packageJson.build.win,
