@@ -6,6 +6,48 @@ on:
   workflow_dispatch:
 
 jobs:
+  build-store-appx:
+    runs-on: windows-latest
+    env:
+      STORE_IDENTITY_NAME: ${{ vars.STORE_IDENTITY_NAME }}
+      STORE_PUBLISHER: ${{ vars.STORE_PUBLISHER }}
+      STORE_PUBLISHER_DISPLAY_NAME: ${{ vars.STORE_PUBLISHER_DISPLAY_NAME }}
+    steps:
+      - name: Enable long paths for bundled runtime
+        run: git config --global core.longpaths true
+
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.23.2
+          cache: npm
+
+      - run: npm ci
+      - run: node scripts/setup-binaries.js
+
+      - name: Build Microsoft Store package
+        shell: pwsh
+        run: |
+          subst W: $env:GITHUB_WORKSPACE
+          Set-Location W:\
+          node scripts/build-store-package.js
+
+      - name: Verify package output
+        shell: pwsh
+        run: |
+          $packages = Get-ChildItem -LiteralPath dist/store -Filter '*.appx' -File
+          if (-not $packages) { throw 'No AppX package was produced.' }
+          $packages | Select-Object Name, Length
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: expert-ai-agent-store-appx
+          path: dist/store/*.appx
+          if-no-files-found: error
+          retention-days: 30
+
   build-mac:
     runs-on: macos-latest
     steps:
