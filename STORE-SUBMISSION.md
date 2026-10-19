@@ -71,6 +71,12 @@ Developer signing/notarization credentials are not configured in GitHub Actions.
 They are suitable for controlled testing; broad consumer distribution needs the
 Developer ID signing and notarization setup so Gatekeeper opens them normally.
 
+The Mac CI job also builds the private `ssv-asia/expert-ai-phone` submodule. Its
+GitHub Actions runner cannot read that repository with the default token. Before
+rerunning the Mac build, add a fine-grained, read-only token with Contents: Read
+access to that repository as the `EXPERT_AI_PHONE_TOKEN` Actions secret in this
+repository. The token is only used by checkout to fetch the submodule.
+
 ## Store references
 
 - [Microsoft Store distribution options for Win32 apps](https://learn.microsoft.com/en-us/windows/apps/distribute-through-store/how-to-distribute-your-win32-app-through-microsoft-store)

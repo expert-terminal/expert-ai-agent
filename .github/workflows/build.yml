@@ -10,6 +10,10 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # This repository's phone backend is a private submodule in ssv-asia.
+          # Add a read-only PAT as EXPERT_AI_PHONE_TOKEN in repository Actions secrets.
+          token: ${{ secrets.EXPERT_AI_PHONE_TOKEN || github.token }}
 
       - name: Initialize submodules
         run: |
@@ -94,6 +98,9 @@ jobs:
   build-windows:
     runs-on: windows-latest
     steps:
+      - name: Enable long paths for bundled runtime
+        run: git config --global core.longpaths true
+
       - uses: actions/checkout@v4
 
       - name: Setup Node
