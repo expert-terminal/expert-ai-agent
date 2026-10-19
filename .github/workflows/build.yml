@@ -110,7 +110,13 @@ jobs:
           cache: 'npm'
 
       - name: Build for Windows
-        run: npm run build:win
+        shell: pwsh
+        run: |
+          # The bundled Pi SDK includes a few deep Mistral SDK paths that exceed
+          # the classic Windows path limit from the normal Actions workspace.
+          subst W: $env:GITHUB_WORKSPACE
+          Set-Location W:\
+          npm run build:win
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4

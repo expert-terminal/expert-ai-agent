@@ -22,7 +22,12 @@ jobs:
           cache: npm
       - run: npm ci
       - run: node scripts/setup-binaries.js
-      - run: node scripts/build-store-package.js
+      - name: Build Store package from a short workspace path
+        shell: pwsh
+        run: |
+          subst W: $env:GITHUB_WORKSPACE
+          Set-Location W:\
+          node scripts/build-store-package.js
       - name: Verify Store package exists
         shell: pwsh
         run: |
