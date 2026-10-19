@@ -24,24 +24,31 @@ packages after certification; the publisher does not need to buy or provide a
 trusted code-signing certificate. The app still needs the exact package identity
 and publisher values assigned after reserving the product name in Partner Center.
 
-The repository now includes a separate `npm run build:store` path. It produces an
-x64 `.appx` candidate without changing the existing NSIS `.exe` release target. It
-requires these values from the Partner Center product identity page:
+The repository includes a separate `npm run build:store` path. It produces an
+x64 `.appx` candidate without changing the existing NSIS `.exe` release target.
+The current Partner Center product is named **Expert AI** and its identity values
+are:
 
-- `STORE_IDENTITY_NAME`: the exact package identity name.
-- `STORE_PUBLISHER`: the exact publisher subject string.
-- `STORE_PUBLISHER_DISPLAY_NAME`: the publisher display name.
+- `STORE_IDENTITY_NAME`: `ssv.asia.ExpertAI`
+- `STORE_PUBLISHER`: `CN=26DB7536-3BFC-49C0-B130-3860C6D7A511`
+- `STORE_PUBLISHER_DISPLAY_NAME`: `ssv.asia`
 
-For GitHub builds, add them as repository Actions variables with those exact names.
-They are public package metadata, not signing secrets. The Store workflow is ready
-to produce an upload candidate after those values are configured.
+These are configured as repository Actions variables; they are package identity
+metadata, not signing secrets. The AppX manifest display name is `Expert AI`.
+
+The current version `0.1.5` package was built locally at
+`dist/store-final-2026-10-19/Expert AI Agent-0.1.5-x64.appx`. Its manifest was
+checked against the Partner Center identity and the package was successfully
+unpacked by Microsoft's MakeAppx tooling. It is unsigned as expected for a Store
+submission; upload it to Partner Center for its package validation and certification
+checks. This local package has not yet passed Store certification.
 
 Before submitting the candidate:
 
-1. Reserve **Expert AI Agent** in Partner Center and set the three build variables
-   from the product identity page. Never substitute guessed identity strings.
-2. Build the AppX package and test it on a clean Windows machine installed from the
-   package: first launch, tray behavior, sign-in, pairing, local server, file and
+1. Keep the reserved **Expert AI** product and its exact package identity values.
+2. Upload the AppX package to Partner Center and resolve any package validation
+   findings. After Microsoft signs and returns the Store package, test installation
+   and verify first launch, tray behavior, sign-in, pairing, local server, file and
    command tools, upgrade, and uninstall.
 3. Update the public privacy policy to include the Windows desktop app's account
    and diagnostic data, local workspace/file/command access, Gateway and model
