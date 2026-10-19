@@ -105,6 +105,26 @@ function ensureBinaryExecutable() {
   }
 }
 
+async function waitForHealth(child, isCurrent, timeoutMs = 20000) {
+  const deadline = Date.now() + timeoutMs;
+  const healthUrl = `http://127.0.0.1:${PI_SERVER_PORT}/healthz`;
+  while (Date.now() < deadline) {
+    if (!isCurrent(child)) return false;
+    try {
+      const response = await fetch(healthUrl, { signal: AbortSignal.timeout(700) });
+      if (response.ok) {
+        const body = await response.json();
+        if (body?.status === 'ok') return true;
+      }
+    } catch {
+      // The listener may still be binding. Keep polling briefly instead of
+      // advertising the computer while its HTTP API is not ready yet.
+    }
+    await new Promise((resolve) => setTimeout(resolve, 120));
+  }
+  return false;
+}
+
 function paths() {
   const dir = path.join(app.getPath('userData'), 'pi-server');
   return {
@@ -158,14 +178,9 @@ function modelsJsonPath() {
 const GATEWAY_URL = 'https://api.ssv.asia'; // custom domain (verified 2026-08-29); was expert-ai-gateway.arthouse.workers.dev
 const GATEWAY_MODEL_ID = 'openrouter/unlimited';
 
-// Phase 1 of the product's real target use case (knowledge workers, starting with
-// Obsidian vault management before PDF/PPTX/other document work later): the agent
-// already gets real file/bash access to whatever folder is picked in "Allowed
-// folder" — pointing that at a vault gives it read/write access already. What was
-// missing is behavior: without this, it has no reason to know Obsidian's actual
-// conventions and would happily write plain, un-vault-shaped markdown. This is
-// deliberately just a system prompt — no new MCP servers or skill packages wired
-// in yet, that's the next step once this baseline is confirmed working.
+// Keep the default prompt useful for any selected workspace. The former default
+// assumed every workspace was an Obsidian vault, which could derail ordinary
+// coding and file tasks. Obsidian conventions are now conditional on the task.
 // This is injected into the generated config.toml as [chat] system_prompt
 // (see ensureConfig below), JSON.stringify-escaped, so it is NOT passed as a
 // CLI argument and is safe from cmd.exe/pi.cmd batch-file argument parsing.
@@ -180,14 +195,14 @@ const GATEWAY_MODEL_ID = 'openrouter/unlimited';
 // config value straight back into a CLI arg — the TOML route does NOT keep it off the
 // command line). A ~2KB arg went through cmd.exe's batch-escaping on every spawn; trimming
 // it cuts that per-spawn cost and the batch-arg fragility. Behaviour kept, prose dropped.
-const OBSIDIAN_SYSTEM_PROMPT =
-  "You are managing an Obsidian vault: the allowed folder IS the vault, so treat every .md file as a note. " +
-  "Use [[wikilinks]] not markdown links between notes. Preserve and match existing YAML frontmatter, tag style, " +
-  "and folder/naming conventions rather than inventing new ones. Use plain markdown, not raw HTML. " +
-  "When editing a note keep its structure and voice; check for an existing note before creating a duplicate. " +
-  "Never delete or overwrite existing content unless explicitly asked; for anything hard to reverse, say what " +
-  "you will do and wait for confirmation. If the user only says hi, briefly say you have read/write/command " +
-  "access to their vault folder and understand Obsidian's format, then ask what they want -- two sentences, no menu.";
+const DEFAULT_AGENT_SYSTEM_PROMPT =
+  "You are Expert AI Agent, a coding and computer-use assistant working in the user's selected workspace. " +
+  "Follow the user's current request and use the available tools to perform requested local work; do not merely describe commands when you can run them. " +
+  "Only call tools that are actually defined and enabled in this request. Never invent tool names or print pseudo tool-call syntax as plain text. " +
+  "For a request to list files or folders, use the available filesystem or shell tools on the requested working directory, then report the actual results. " +
+  "Treat project instructions as relevant only to the files and task they govern. Do not assume the workspace is an Obsidian vault. " +
+  "When the user is working in an Obsidian vault, preserve its existing note structure, frontmatter, tags, and naming conventions, and use wikilinks where appropriate. " +
+  "Never claim to have read, changed, or executed something unless a tool result confirms it. Preserve existing content and avoid destructive actions unless the user asks for them.";
 
 /** Writes ~/.pi/agent/models.json with the Expert AI router and the direct
  *  choices still available to this desktop's signed-in gateway account.
@@ -246,6 +261,16 @@ async function writeModelsJson(session) {
               // think at all. Declaring it true is what lets that selector actually
               // take effect.
               reasoning: true,
+              // This auto route accepts only low/medium/high. The Gateway cannot
+              // safely promise a true no-reasoning mode or a higher max effort here.
+              thinkingLevelMap: {
+                off: null,
+                minimal: null,
+                low: 'low',
+                medium: 'medium',
+                high: 'high',
+                xhigh: null,
+              },
               input: ['text'],
               contextWindow: 128000,
               maxTokens: 8192,
@@ -267,12 +292,20 @@ async function writeModelsJson(session) {
                 maxTokensField: 'max_tokens',
               },
             },
-            ...directModels.map(({ id, name }) => ({
-              id, name, reasoning: false, input: ['text'], contextWindow: 128000,
-              maxTokens: 8192,
-              cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-              compat: { supportsDeveloperRole: false, maxTokensField: 'max_tokens' },
-            })),
+            ...directModels.map(({ id, name }) => {
+              const reasoning = id === 'expert-ai/claude-haiku' || id === 'expert-ai/claude-sonnet';
+              const thinkingLevelMap = id === 'expert-ai/claude-haiku'
+                ? { off: 'none', minimal: 'minimal', low: 'low', medium: 'medium', high: 'high', xhigh: 'max' }
+                : id === 'expert-ai/claude-sonnet'
+                  ? { off: null, minimal: 'minimal', low: 'low', medium: 'medium', high: 'high', xhigh: 'max' }
+                  : undefined;
+              return {
+                id, name, reasoning, ...(thinkingLevelMap ? { thinkingLevelMap } : {}),
+                input: ['text'], contextWindow: 128000, maxTokens: 8192,
+                cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+                compat: { ...(reasoning ? { thinkingFormat: 'openrouter' } : {}), supportsDeveloperRole: false, maxTokensField: 'max_tokens' },
+              };
+            }),
           ],
         },
       }
@@ -349,11 +382,11 @@ async function ensureConfig(workdir, relayUrl, session) {
   // ── Otherwise: generated config, with three knobs from agent-settings.json ──
   //   { "systemPrompt": string|null, "noTools": bool, "extensions": string[],
   //     "packageName": string }
-  // null systemPrompt = the vault-aware default; "" = no system prompt at all.
+  // null systemPrompt = the general agent default; "" = no system prompt at all.
   const knobs = readJsonSafe(path.join(p.dir, 'agent-settings.json'), {});
   const systemPrompt =
     knobs.systemPrompt === undefined || knobs.systemPrompt === null
-      ? OBSIDIAN_SYSTEM_PROMPT
+      ? DEFAULT_AGENT_SYSTEM_PROMPT
       : String(knobs.systemPrompt);
   const noTools = knobs.noTools === undefined ? false : !!knobs.noTools;
   const extensions = Array.isArray(knobs.extensions) ? knobs.extensions : [];
@@ -505,13 +538,22 @@ class PiServerManager {
     this._pendingYs = 0;     // approx count of unconsumed "y\n" we've buffered (bounded top-up)
     this._armed = false;
     this._inviteAccessToken = null;
+    this._startQueue = Promise.resolve();
   }
 
   /** `session` is optional — omit it to keep whatever was last passed (so an
    *  in-app "Restart server" click, which doesn't know the session, doesn't wipe
    *  out the gateway model config that sign-in wrote). Pass it explicitly right
    *  after sign-in so the newly-issued token takes effect immediately. */
-  async start(relayUrl, session) {
+  start(relayUrl, session) {
+    // Sign-in can arrive while the launch-time start is still waiting for the
+    // port. Serialize restarts so an older launch cannot replace the new token.
+    const next = this._startQueue.catch(() => {}).then(() => this._start(relayUrl, session));
+    this._startQueue = next;
+    return next;
+  }
+
+  async _start(relayUrl, session) {
     if (this.retryTimer) {
       clearTimeout(this.retryTimer);
       this.retryTimer = null;
@@ -587,6 +629,9 @@ class PiServerManager {
         EXPERT_AI_RELAY_URL: relayUrl,
         HOME: isolatedHome,
         USERPROFILE: isolatedHome,
+        // The agent's own config stays in isolatedHome, while the authenticated
+        // phone file browser resolves the user's real Desktop and Downloads.
+        EXPERT_AI_HOST_HOME: os.homedir(),
         // pi-server defaults to `pi_server=debug,tower_http=debug` — that's ~5-10
         // stdout lines per HTTP request, and during an active chat every one of
         // them is piped to this process, appended to the log buffer, sliced, and
@@ -637,14 +682,18 @@ class PiServerManager {
       }
     });
 
-    // Give it a moment to bind the port before reporting "running" — pi-server has
-    // no explicit "ready" signal on stdout we can key off cheaply, so this is a
-    // pragmatic wait, not a real health check.
-    await new Promise((r) => setTimeout(r, 1500));
-    if (this.child) {
+    // Only report "running" and publish this computer after the actual HTTP API
+    // answers health checks. A fixed sleep let the phone pair during slow cold
+    // starts, then its first session request raced a listener that was not ready.
+    const ready = await waitForHealth(child, (candidate) => this.child === candidate && !this.stopping);
+    if (ready && this.child === child) {
       this.retryCount = 0;
       this._setStatus('running');
-    } else {
+    } else if (this.child === child && !this.stopping) {
+      this.lastError = 'Pi server did not become ready within 20 seconds. Restarting automatically.';
+      this._setStatus('error');
+      this._scheduleRetry();
+    } else if (!this.child) {
       this._setStatus('stopped');
     }
   }

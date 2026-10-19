@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <title>Expert AI Agent</title>
+<link rel="icon" type="image/png" href="../assets/expert-ai-owl-enlarged-transparent.png" />
 <style>
   :root {
     color-scheme: dark;
@@ -116,11 +117,22 @@
   .dep-status { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 600; }
   .dep-status.installed { background: #1f5c33; color: #b6f2c8; }
   .dep-status.missing { background: #5c1f1f; color: #f2b6b6; }
+  .chat-library-head { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+  .chat-library-list { display:flex; flex-direction:column; gap:7px; max-height:260px; overflow:auto; margin-top:12px; }
+  .chat-row { display:flex; align-items:center; gap:12px; width:100%; text-align:left; padding:10px 12px; }
+  .chat-row.selected { border-color:var(--accent); background:#292044; }
+  .chat-row-main { flex:1; min-width:0; }
+  .chat-row-title { font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .chat-row-meta { color:var(--text-faint); font-size:11px; margin-top:4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .chat-viewer { display:none; margin-top:14px; border-top:1px solid var(--card-border); padding-top:14px; }
+  .chat-viewer.visible { display:block; }
+  .chat-transcript { max-height:360px; overflow:auto; white-space:pre-wrap; overflow-wrap:anywhere; background:#10101c; border:1px solid var(--card-border); border-radius:8px; padding:12px; line-height:1.55; }
+  .chat-actions { display:flex; gap:8px; flex-wrap:wrap; margin:10px 0; }
 </style>
 </head>
 <body>
   <div class="app-header">
-    <img src="../assets/expert-ai-owl-transparent.png" alt="Expert AI owl" />
+    <img src="../assets/expert-ai-owl-enlarged-transparent.png" alt="Expert AI owl" />
     <div>
       <h1>Expert AI Agent</h1>
       <p class="sub">Runs Agent mode locally on this machine, paired to your Expert AI phone app.</p>
@@ -225,6 +237,32 @@
       </div>
       <div class="hint" id="handoffStatus">Import a mobile job, then provide a local agent session ID to continue it through the existing Pi API.</div>
       <button id="copyHandoffResponse" class="subtle" style="display:none; margin-top:8px;">Copy imported response</button>
+    </div>
+
+    <div class="card">
+      <div class="chat-library-head">
+        <div>
+          <label style="margin-bottom:4px">Chat history</label>
+          <div class="hint" style="margin-top:0">Browse chats saved on this computer. Export a Markdown copy to share or open with another coding agent.</div>
+        </div>
+        <button id="refreshChats">Refresh</button>
+      </div>
+      <div class="hint" id="chatLibraryStatus">Loading local chats…</div>
+      <div class="chat-library-list" id="chatLibraryList"></div>
+      <div class="chat-viewer" id="chatViewer">
+        <div class="chat-library-head">
+          <div>
+            <div id="chatViewerTitle" style="font-weight:600"></div>
+            <div id="chatViewerMeta" class="hint"></div>
+          </div>
+        </div>
+        <div class="chat-actions">
+          <button class="primary" id="exportChat">Export Markdown and show in Explorer</button>
+          <button id="copyChatExportPath" style="display:none">Copy file path</button>
+        </div>
+        <div class="hint" id="chatExportPath" style="display:none; overflow-wrap:anywhere"></div>
+        <pre class="chat-transcript" id="chatTranscript"></pre>
+      </div>
     </div>
 
     <div class="card">

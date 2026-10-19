@@ -324,6 +324,107 @@ function formatUsageText(balance) {
     setTimeout(() => { button.textContent = 'Copy imported response'; }, 1800);
   });
 
+  // Local session browser: read history from the isolated Pi session store and
+  // let users export an ordinary Markdown file they can open or share.
+  const chatLibraryStatus = document.getElementById('chatLibraryStatus');
+  const chatLibraryList = document.getElementById('chatLibraryList');
+  const chatViewer = document.getElementById('chatViewer');
+  const chatTranscript = document.getElementById('chatTranscript');
+  let selectedChat = null;
+
+  function selectChatRow(row) {
+    for (const item of chatLibraryList.querySelectorAll('.chat-row')) {
+      item.classList.toggle('selected', item.dataset.filePath === row.filePath);
+    }
+  }
+
+  async function openChat(row) {
+    selectedChat = row;
+    selectChatRow(row);
+    chatViewer.classList.add('visible');
+    document.getElementById('chatViewerTitle').textContent = row.title;
+    document.getElementById('chatViewerMeta').textContent = `${row.messageCount} messages · ${row.cwd || 'Workspace unavailable'} · ${new Date(row.modifiedAt).toLocaleString()}`;
+    chatTranscript.textContent = 'Loading conversation…';
+    document.getElementById('chatExportPath').style.display = 'none';
+    document.getElementById('copyChatExportPath').style.display = 'none';
+    try {
+      const detail = await window.expertAgent.readChat(row.filePath);
+      if (selectedChat?.filePath !== row.filePath) return;
+      chatTranscript.textContent = detail.messages.length
+        ? detail.messages.map((message) => `${message.role === 'user' ? 'You' : 'Expert AI Agent'}\n${message.text}`).join('\n\n')
+        : 'This session does not contain any text messages yet.';
+      document.getElementById('chatViewerTitle').textContent = detail.title;
+      document.getElementById('chatViewerMeta').textContent = `Session ID: ${detail.id} · ${detail.messageCount} messages · ${detail.cwd || 'Workspace unavailable'}`;
+    } catch (error) {
+      chatTranscript.textContent = `Could not open this chat: ${error.message}`;
+    }
+  }
+
+  async function refreshChats() {
+    chatLibraryStatus.textContent = 'Loading local chats…';
+    chatLibraryList.replaceChildren();
+    try {
+      const chats = await window.expertAgent.listChats();
+      if (chats.length === 0) {
+        chatLibraryStatus.textContent = 'No saved chats on this computer yet.';
+        return;
+      }
+      chatLibraryStatus.textContent = `${chats.length}${chats.length === 200 ? '+' : ''} saved chats · stored locally on this computer`;
+      for (const chat of chats) {
+        const row = document.createElement('button');
+        row.type = 'button';
+        row.className = 'chat-row';
+        row.dataset.filePath = chat.filePath;
+        const main = document.createElement('span');
+        main.className = 'chat-row-main';
+        const title = document.createElement('span');
+        title.className = 'chat-row-title';
+        title.textContent = chat.title;
+        const meta = document.createElement('span');
+        meta.className = 'chat-row-meta';
+        meta.textContent = `${chat.messageCount} messages · ${new Date(chat.modifiedAt).toLocaleString()} · ${chat.id}`;
+        main.append(title, meta);
+        row.append(main);
+        row.addEventListener('click', () => openChat(chat));
+        chatLibraryList.append(row);
+      }
+    } catch (error) {
+      chatLibraryStatus.textContent = `Could not load local chat history: ${error.message}`;
+    }
+  }
+
+  document.getElementById('refreshChats').addEventListener('click', refreshChats);
+  document.getElementById('exportChat').addEventListener('click', async () => {
+    if (!selectedChat) return;
+    const button = document.getElementById('exportChat');
+    const pathHint = document.getElementById('chatExportPath');
+    button.disabled = true;
+    button.textContent = 'Exporting…';
+    try {
+      const result = await window.expertAgent.exportChat(selectedChat.filePath);
+      if (result.canceled) return;
+      pathHint.textContent = `Saved and opened in Explorer: ${result.filePath}`;
+      pathHint.style.display = '';
+      const copyPathButton = document.getElementById('copyChatExportPath');
+      copyPathButton.dataset.filePath = result.filePath;
+      copyPathButton.style.display = '';
+    } catch (error) {
+      pathHint.textContent = `Export failed: ${error.message}`;
+      pathHint.style.display = '';
+    } finally {
+      button.disabled = false;
+      button.textContent = 'Export Markdown and show in Explorer';
+    }
+  });
+  document.getElementById('copyChatExportPath').addEventListener('click', async (event) => {
+    const button = event.currentTarget;
+    if (!button.dataset.filePath) return;
+    await navigator.clipboard.writeText(button.dataset.filePath);
+    button.textContent = 'Copied path';
+    setTimeout(() => { button.textContent = 'Copy file path'; }, 1800);
+  });
+  refreshChats();
+
   // Dependencies checker (read-only, bundled during build)
   async function checkDependencies() {
     const depsListEl = document.getElementById('dependenciesList');

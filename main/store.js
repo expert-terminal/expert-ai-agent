@@ -8,7 +8,10 @@ const DEFAULTS = {
   session: null,        // this desktop's OWN gateway session (device-login flow, see auth.js)
   workdir: app.getPath('documents'),
   autoRun: true,        // matches the "auto-run, no confirm prompts" default agreed for v1
-  autoStart: true,
+  // Starting on login is opt-in. This keeps first-run behavior transparent and
+  // gives Store users control over background startup; the tray Settings screen
+  // can enable it when they want the computer available automatically.
+  autoStart: false,
   hasCompletedSetup: false, // drives the first-run wizard vs. the compact dashboard
 };
 

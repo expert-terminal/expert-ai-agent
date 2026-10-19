@@ -11,6 +11,7 @@ node_modules/
 # gave fresh-clone / CI builds a broken pi engine.
 # ---------------------------------------------------------------------------
 /dist/
+/dist-*/
 /out/
 /build/*
 !/build/installer.nsh

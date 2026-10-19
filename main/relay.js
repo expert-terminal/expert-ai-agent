@@ -62,9 +62,10 @@ function generatePairingCode() {
 }
 
 class RelayClient {
-  constructor({ store, onStatusChange }) {
+  constructor({ store, onStatusChange, onReady }) {
     this.store = store;
     this.onStatusChange = onStatusChange || (() => {});
+    this.onReady = onReady || (() => {});
     this.ws = null;
     this.stopped = false;
     this._attempts = 0;
@@ -292,6 +293,7 @@ class RelayClient {
       if (!this._regConfirmed) {
         this._regConfirmed = true;
         console.log('[relay] registration confirmed — tunnel round-trip OK');
+        this.onReady();
       }
       return;
     }

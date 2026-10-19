@@ -12,3 +12,20 @@
   nsExec::Exec 'taskkill /F /IM "${APP_EXECUTABLE_FILENAME}" /T'
   Pop $0
 !macroend
+
+; The previous uninstaller atomically moves every file into $PLUGINSDIR before
+; removing it. pi-node has paths near MAX_PATH, so that longer temporary path
+; fails on Windows even after the app has closed. Let this installer replace the
+; old files if that legacy uninstaller returns an error. The new uninstaller
+; below removes the shorter install path directly for subsequent upgrades.
+!macro customUnInstallCheck
+  ${if} $R0 != 0
+    DetailPrint 'Legacy uninstaller could not move long paths; continuing upgrade in place.'
+    ClearErrors
+    StrCpy $R0 0
+  ${endif}
+!macroend
+
+!macro customRemoveFiles
+  RMDir /r "$INSTDIR"
+!macroend

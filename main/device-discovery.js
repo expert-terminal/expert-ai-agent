@@ -22,7 +22,10 @@ async function publishDevice(store, getConnectUrl) {
     method: 'PUT',
     headers: { authorization: `Bearer ${session.token}`, 'content-type': 'application/json' },
     body: JSON.stringify({ deviceId: deviceId(store), name: os.hostname().slice(0, 80), connectUrl }),
-    signal: AbortSignal.timeout(4000),
+    // A cold per-account Durable Object can take longer than a simple health
+    // request. Give the registration enough time to complete; the caller retries
+    // on the next refresh if the network is temporarily unavailable.
+    signal: AbortSignal.timeout(12000),
   });
   if (!response.ok) throw new Error(`Device discovery registration failed (${response.status})`);
 }

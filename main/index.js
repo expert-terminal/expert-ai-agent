@@ -1,6 +1,7 @@
 const { app, Tray, Menu, BrowserWindow, ipcMain, dialog, nativeImage, Notification, shell } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
+const readline = require('node:readline');
 const { Store } = require('./store');
 const { RelayClient } = require('./relay');
 const { consumeJobHandoff, continueJobHandoff, deviceLogin, isSessionValid } = require('./auth');
@@ -25,10 +26,14 @@ let piServer = null;
 let piServerStatus = 'stopped'; // 'stopped' | 'starting' | 'running'
 let discoveryBusy = false;
 async function refreshDiscovery() {
-  if (discoveryBusy || !store || !relayClient?.isReady?.() || piServerStatus !== 'running') return;
+  // Advertise same-LAN computers even while Cloudflare's relay is reconnecting.
+  // The connect URL carries the LAN address and relay fallback; the APK already
+  // tries LAN first and then the relay. Once relay health recovers, the same
+  // record is refreshed with the relay-only URL.
+  if (discoveryBusy || !store || piServerStatus !== 'running') return;
   discoveryBusy = true;
   try { await publishDevice(store, async () => (await getPiServerState()).connectUrl); }
-  catch (err) { console.warn('[discovery]', err.message); }
+  catch (err) { logger.log('WARN', 'Computer discovery registration failed:', err?.message || String(err)); }
   finally { discoveryBusy = false; }
 }
 // Tracks whether we've already fired the "Connected" notification for the CURRENT
@@ -40,7 +45,7 @@ let notifiedPairedThisRun = false;
 // tick (see pi-server:get). Keyed on the exact connect URL it was built from.
 let qrCache = { url: null, dataUrl: null };
 
-const ICON_PATH = path.join(__dirname, '..', 'assets', process.platform === 'win32' ? 'expert-ai-owl-transparent.ico' : 'expert-ai-owl-transparent.png');
+const ICON_PATH = path.join(__dirname, '..', 'assets', process.platform === 'win32' ? 'expert-ai-owl-enlarged-transparent.ico' : 'expert-ai-owl-enlarged-transparent.png');
 const ICON_EXT = process.platform === 'win32' ? 'ico' : 'png';
 // Color-coded tray icon variants (see assets/*.{ico,png}) so connection state is
 // visible at a glance without opening Settings — grey/plain = not running, amber =
@@ -188,7 +193,7 @@ app.whenReady().then(() => {
   logger.initLogger();
   store = new Store();
 
-  // Autostart on login, matching the "install and use" goal — off switch lives in Settings.
+  // Respect the user's explicit startup preference (off by default).
   app.setLoginItemSettings({ openAtLogin: store.get('autoStart'), openAsHidden: true });
 
   createTray();
@@ -203,6 +208,7 @@ app.whenReady().then(() => {
 
   relayClient = new RelayClient({
     store,
+    onReady: () => refreshDiscovery(),
     onStatusChange: (status) => {
       relayStatus = status;
       refreshTray();
@@ -325,6 +331,150 @@ ipcMain.handle('handoff:consume', async (_event, jobId, invitationToken) => {
 ipcMain.handle('handoff:continue', async (_event, jobId, state, sessionId, instruction) => {
   try { return { ok: true, result: await continueJobHandoff(store.get('session'), jobId, state, sessionId, instruction) }; }
   catch (error) { return { ok: false, error: error instanceof Error ? error.message : String(error) }; }
+});
+
+// Local chat history stays on this computer. Pi stores append-only JSONL files
+// under the app's isolated userData directory; keep the UI bridge read-only and
+// validate every path before opening or exporting a session.
+function chatSessionsRoot() {
+  return path.join(app.getPath('userData'), '.pi', 'agent', 'sessions');
+}
+
+function safeSessionPath(filePath) {
+  const root = path.resolve(chatSessionsRoot());
+  const resolved = path.resolve(String(filePath || ''));
+  const rootPrefix = root + path.sep;
+  const insideRoot = process.platform === 'win32'
+    ? resolved.toLowerCase().startsWith(rootPrefix.toLowerCase())
+    : resolved.startsWith(rootPrefix);
+  if (!insideRoot || !resolved.toLowerCase().endsWith('.jsonl')) {
+    throw new Error('Invalid chat history path');
+  }
+  return resolved;
+}
+
+function messageText(message) {
+  if (!message || (message.role !== 'user' && message.role !== 'assistant')) return '';
+  if (typeof message.content === 'string') return message.content.trim();
+  if (!Array.isArray(message.content)) return '';
+  return message.content
+    .filter((part) => part && part.type === 'text' && typeof part.text === 'string')
+    .map((part) => part.text.trim())
+    .filter(Boolean)
+    .join('\n');
+}
+
+async function readChatFile(filePath, includeMessages = false) {
+  const resolved = safeSessionPath(filePath);
+  const root = await fs.promises.realpath(chatSessionsRoot());
+  const realFile = await fs.promises.realpath(resolved);
+  const relative = path.relative(root, realFile);
+  if (!relative || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) throw new Error('Chat history file is unavailable');
+
+  const stat = await fs.promises.stat(realFile);
+  if (!stat.isFile()) throw new Error('Chat history file is unavailable');
+  let id = path.basename(realFile, '.jsonl');
+  let cwd = '';
+  let title = '';
+  let firstUserMessage = '';
+  let messageCount = 0;
+  let messages = [];
+  const input = fs.createReadStream(realFile, { encoding: 'utf8' });
+  const lines = readline.createInterface({ input, crlfDelay: Infinity });
+  try {
+    for await (const line of lines) {
+      let entry;
+      try { entry = JSON.parse(line); } catch { continue; }
+      if (entry.type === 'session' && entry.id) {
+        id = String(entry.id);
+        cwd = typeof entry.cwd === 'string' ? entry.cwd : '';
+      }
+      if (entry.type === 'session_info' && typeof entry.name === 'string') title = entry.name.trim();
+      if (entry.type !== 'message' || !entry.message) continue;
+      const text = messageText(entry.message);
+      if (!text) continue;
+      messageCount++;
+      if (entry.message.role === 'user' && !firstUserMessage) firstUserMessage = text;
+      if (includeMessages) messages.push({ role: entry.message.role, text });
+    }
+  } finally {
+    lines.close();
+  }
+
+  return {
+    id,
+    filePath: realFile,
+    cwd,
+    title: title || firstUserMessage.split(/\s+/).slice(0, 12).join(' ').slice(0, 96) || 'New chat',
+    firstUserMessage,
+    messageCount,
+    modifiedAt: stat.mtime.toISOString(),
+    messages,
+  };
+}
+
+ipcMain.handle('chats:list', async () => {
+  const root = chatSessionsRoot();
+  if (!fs.existsSync(root)) return [];
+  const files = [];
+  const roots = await fs.promises.readdir(root, { withFileTypes: true });
+  // Pi places each workspace's sessions directly in one encoded-cwd folder.
+  // Also include legacy JSONL files at the root, without recursively walking
+  // arbitrary directories or files outside Pi's session store.
+  for (const entry of roots) {
+    const entryPath = path.join(root, entry.name);
+    if (entry.isFile() && entry.name.toLowerCase().endsWith('.jsonl')) files.push(entryPath);
+    if (entry.isDirectory()) {
+      const children = await fs.promises.readdir(entryPath, { withFileTypes: true });
+      for (const child of children) {
+        if (child.isFile() && child.name.toLowerCase().endsWith('.jsonl')) files.push(path.join(entryPath, child.name));
+      }
+    }
+  }
+  const candidates = await Promise.all(files.map(async (filePath) => {
+    try { return { filePath, mtime: (await fs.promises.stat(filePath)).mtimeMs }; }
+    catch { return null; }
+  }));
+  const newest = candidates.filter(Boolean).sort((a, b) => b.mtime - a.mtime).slice(0, 200);
+  const results = [];
+  for (let i = 0; i < newest.length; i += 8) {
+    const batch = await Promise.all(newest.slice(i, i + 8).map(async ({ filePath }) => {
+      try { return await readChatFile(filePath, false); } catch (error) {
+        logger.log('WARN', 'Could not read local chat metadata:', error?.message || String(error));
+        return null;
+      }
+    }));
+    results.push(...batch);
+  }
+  return results.filter(Boolean)
+    .sort((a, b) => Date.parse(b.modifiedAt) - Date.parse(a.modifiedAt))
+    .slice(0, 200);
+});
+
+ipcMain.handle('chats:read', async (_event, filePath) => readChatFile(filePath, true));
+
+ipcMain.handle('chats:export', async (_event, filePath) => {
+  const chat = await readChatFile(filePath, true);
+  const safeTitle = chat.title.replace(/[<>:"/\\|?*\x00-\x1f]/g, '-').replace(/\s+/g, ' ').trim().slice(0, 80) || 'Expert AI chat';
+  const result = await dialog.showSaveDialog(settingsWindow, {
+    title: 'Export chat history',
+    defaultPath: path.join(app.getPath('documents'), `${safeTitle}.md`),
+    filters: [{ name: 'Markdown', extensions: ['md'] }],
+  });
+  if (result.canceled || !result.filePath) return { canceled: true };
+  const date = new Date(chat.modifiedAt).toLocaleString();
+  const transcript = [
+    `# ${chat.title}`,
+    '',
+    `- Session ID: \`${chat.id}\``,
+    `- Workspace: \`${chat.cwd || 'Unknown'}\``,
+    `- Last updated: ${date}`,
+    '',
+    ...chat.messages.flatMap((message) => [`## ${message.role === 'user' ? 'You' : 'Expert AI Agent'}`, '', message.text, '']),
+  ].join('\n');
+  await fs.promises.writeFile(result.filePath, transcript, 'utf8');
+  shell.showItemInFolder(result.filePath);
+  return { canceled: false, filePath: result.filePath };
 });
 
 async function getPiServerState() {
