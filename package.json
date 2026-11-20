@@ -99,5 +99,17 @@
       "icon": "assets/expert-ai-owl-enlarged-transparent.png",
       "category": "Utility"
     }
-  }
+  },
+  "directories": {
+    "test": "test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ssv-asia/expert-ai-tray.git"
+  },
+  "keywords": [],
+  "bugs": {
+    "url": "https://github.com/ssv-asia/expert-ai-tray/issues"
+  },
+  "homepage": "https://github.com/ssv-asia/expert-ai-tray#readme"
 }

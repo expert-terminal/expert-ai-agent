@@ -1,0 +1,10 @@
+{
+  "id": "expert-ai-companion",
+  "name": "Expert AI",
+  "version": "0.5.6",
+  "minAppVersion": "1.8.0",
+  "description": "Connect Expert AI to your Obsidian vault for live edits, searchable notes, Git sync, and private cloud recovery.",
+  "author": "ssv.asia",
+  "authorUrl": "https://ssv.asia",
+  "isDesktopOnly": true
+}

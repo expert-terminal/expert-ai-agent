@@ -1,0 +1,26 @@
+{
+  "name": "expert-ai-obsidian-companion",
+  "version": "0.5.6",
+  "private": true,
+  "description": "Live Obsidian vault companion for Expert AI Agent",
+  "type": "module",
+  "scripts": {
+    "build": "node esbuild.mjs",
+    "build:extension": "node esbuild.mjs --extension-only",
+    "dev": "node esbuild.mjs --watch",
+    "test": "node --test --import tsx test/*.test.ts test/*.test.mjs",
+    "check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@huggingface/transformers": "4.3.2",
+    "typebox": "1.1.38"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.30",
+    "esbuild": "^0.28.0",
+    "fake-indexeddb": "^6.2.7",
+    "obsidian": "1.14.4",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  }
+}

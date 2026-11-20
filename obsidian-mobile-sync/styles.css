@@ -1,0 +1,16 @@
+.eaims { padding: 10px; }
+.eaims-head { display:flex; align-items:center; gap:10px; margin-bottom:14px; }
+.eaims-head img { width:32px; height:32px; border-radius:8px; }
+.eaims-state { padding:10px; border-radius:8px; background:var(--background-secondary); margin:10px 0; }
+.eaims-log { max-height:45vh; overflow:auto; }
+.eaims-log-row { border-top:1px solid var(--background-modifier-border); padding:8px 2px; font-size:var(--font-smaller); }
+.eaims-good { color:var(--color-green); }
+.eaims-warn { color:var(--color-orange); }
+.eaims-conflict { border-left:3px solid var(--color-orange); padding-left:8px; margin:8px 0; }
+.eaims-compare-columns { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; max-height:70vh; overflow:auto; }
+.eaims-compare-panel { min-width:0; border:1px solid var(--background-modifier-border); border-radius:8px; padding:8px; }
+.eaims-compare-panel pre { white-space:pre-wrap; overflow-wrap:anywhere; max-height:62vh; overflow:auto; font-size:.85em; }
+.eaims-actions { display:flex; flex-wrap:wrap; gap:8px; margin:10px 0; }
+.eaims-subtle { color:var(--text-muted); font-size:var(--font-smaller); }
+.eaims-device-code-row { display:flex; align-items:center; gap:8px; margin:12px 0; }
+.eaims-device-code { flex:1; min-width:0; padding:10px 12px; font-family:var(--font-monospace); font-size:1.25em; letter-spacing:.12em; text-align:center; user-select:text; -webkit-user-select:text; }

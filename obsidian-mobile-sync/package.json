@@ -1,0 +1,8 @@
+{
+  "name": "expert-ai-mobile-sync",
+  "version": "0.3.2",
+  "private": true,
+  "type": "module",
+  "scripts": { "build": "node esbuild.mjs", "check": "tsc --noEmit" },
+  "devDependencies": { "esbuild": "^0.28.0", "obsidian": "1.14.4", "typescript": "^5.9.3" }
+}
