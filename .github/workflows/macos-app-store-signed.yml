@@ -193,9 +193,11 @@ jobs:
           VERSION=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Contents/Info.plist")
           BUILD=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$APP/Contents/Info.plist")
           MINIMUM_MACOS=$(/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' "$APP/Contents/Info.plist" 2>/dev/null || printf 'Electron default')
+          MULTIPLE_INSTANCES_PROHIBITED=$(/usr/libexec/PlistBuddy -c 'Print :LSMultipleInstancesProhibited' "$APP/Contents/Info.plist")
           test "$BUNDLE" = 'asia.ssv.expert-ai-agent'
           test "$VERSION" = '0.1.6'
           test "$BUILD" = "$GITHUB_RUN_NUMBER"
+          test "$MULTIPLE_INSTANCES_PROHIBITED" = 'true'
           codesign -d --entitlements :- "$APP" > "$RUNNER_TEMP/mas-entitlements.plist" 2>/dev/null
           node - "$RUNNER_TEMP/mas-entitlements.plist" <<'NODE'
           const fs = require('node:fs');

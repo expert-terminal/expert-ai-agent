@@ -45,6 +45,9 @@ const config = {
     extendInfo: {
       ...packageJson.build.mac.extendInfo,
       NSHumanReadableCopyright: copyright,
+      // Electron's requestSingleInstanceLock() cannot bind its temporary Unix
+      // socket from the MAS App Sandbox. Let Launch Services prohibit duplicates.
+      LSMultipleInstancesProhibited: true,
     },
   },
   mas: {

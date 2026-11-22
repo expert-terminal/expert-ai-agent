@@ -11,7 +11,11 @@ const QRCode = require('qrcode');
 const logger = require('./logger');
 
 // Single instance: the tray app is meant to run one persistent copy per machine.
-const gotLock = app.requestSingleInstanceLock();
+// The Electron MAS build cannot bind the temporary SingletonSocket outside its
+// App Sandbox container (process_singleton_posix reports EPERM), so use Launch
+// Services' LSMultipleInstancesProhibited setting for that build instead.
+const isMasApp = process.platform === 'darwin' && process.mas === true;
+const gotLock = isMasApp || app.requestSingleInstanceLock();
 if (!gotLock) {
   app.quit();
   process.exit(0);
@@ -260,9 +264,14 @@ app.on('before-quit', () => {
   stopWorkspaceAccess = null;
 });
 
-app.on('second-instance', () => {
-  createSettingsWindow();
-});
+// MAS single-instance behavior is enforced by Launch Services through the
+// LSMultipleInstancesProhibited Info.plist key. Keep Electron's socket lock and
+// second-instance event for Windows and the non-Store macOS build.
+if (!isMasApp) {
+  app.on('second-instance', () => {
+    createSettingsWindow();
+  });
+}
 
 // Tray apps don't quit when their only window closes.
 app.on('window-all-closed', (e) => e.preventDefault());
