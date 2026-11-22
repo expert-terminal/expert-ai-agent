@@ -129,12 +129,12 @@ jobs:
       - name: Verify signature, bundle identity, and build metadata
         run: |
           set -euo pipefail
-          mapfile -t PACKAGES < <(find dist/mas -maxdepth 1 -type f -name '*.pkg' -print)
-          if [[ "${#PACKAGES[@]}" -ne 1 ]]; then
-            echo "Expected one universal Mac App Store package, found ${#PACKAGES[@]}"
+          PACKAGE_COUNT=$(find dist/mas -maxdepth 1 -type f -name '*.pkg' -print | wc -l | tr -d '[:space:]')
+          if [[ "$PACKAGE_COUNT" -ne 1 ]]; then
+            echo "Expected one universal Mac App Store package, found $PACKAGE_COUNT"
             exit 1
           fi
-          PKG="${PACKAGES[0]}"
+          PKG=$(find dist/mas -maxdepth 1 -type f -name '*.pkg' -print -quit)
           pkgutil --check-signature "$PKG"
           EXPANDED="$RUNNER_TEMP/mas-expanded"
           pkgutil --expand-full "$PKG" "$EXPANDED"
