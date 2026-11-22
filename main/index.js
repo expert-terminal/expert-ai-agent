@@ -15,6 +15,12 @@ const logger = require('./logger');
 // App Sandbox container (process_singleton_posix reports EPERM), so use Launch
 // Services' LSMultipleInstancesProhibited setting for that build instead.
 const isMasApp = process.platform === 'darwin' && process.mas === true;
+// Build 20 logs from an Intel macOS 13.7.8 Mac showed Chromium's GPU process
+// repeatedly exiting (exit_code=4), followed by Chromium's fatal
+// "GPU process isn't usable" and SIGTRAP. MAS-only software rendering avoids
+// that launch-fatal GPU subprocess path on older Intel Macs. This must run
+// before Electron's ready event.
+if (isMasApp) app.disableHardwareAcceleration();
 const gotLock = isMasApp || app.requestSingleInstanceLock();
 if (!gotLock) {
   app.quit();
@@ -206,7 +212,13 @@ app.whenReady().then(() => {
   }
 
   // Respect the user's explicit startup preference (off by default).
-  app.setLoginItemSettings({ openAtLogin: store.get('autoStart'), openAsHidden: true });
+  const openAtLogin = store.get('autoStart');
+  // Avoid a sandbox-denied Launch Services call on every MAS launch when the
+  // user's default preference is off. Keep the existing action for enabled
+  // startup and for non-MAS builds.
+  if (!process.mas || openAtLogin) {
+    app.setLoginItemSettings({ openAtLogin, openAsHidden: true });
+  }
 
   createTray();
   // Pairing (and un-pairing on restart) changes with no status transition of its

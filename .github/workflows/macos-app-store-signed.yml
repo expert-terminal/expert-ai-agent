@@ -227,6 +227,31 @@ jobs:
           }
           console.log(`Verified app-group entitlement: ${expectedGroup}`);
           NODE
+          for HELPER in \
+            "$APP/Contents/Resources/pi-server" \
+            "$APP/Contents/Resources/pi-server-x64" \
+            "$APP/Contents/Resources/pi-node/node"; do
+            test -x "$HELPER"
+            codesign --verify --strict --verbose=2 "$HELPER"
+            HELPER_SIGNATURE=$(codesign -dv --verbose=4 "$HELPER" 2>&1)
+            printf '%s\n' "$HELPER_SIGNATURE" | grep -F "TeamIdentifier=$APPLE_TEAM_ID"
+            codesign -d --entitlements :- "$HELPER" > "$RUNNER_TEMP/mas-helper-entitlements.plist" 2>/dev/null
+            HELPER_PATH="$HELPER" node - "$RUNNER_TEMP/mas-helper-entitlements.plist" <<'NODE'
+          const fs = require('node:fs');
+          const plist = require('plist');
+          const entitlements = plist.parse(fs.readFileSync(process.argv[2], 'utf8'));
+          for (const key of ['com.apple.security.app-sandbox', 'com.apple.security.inherit']) {
+            if (entitlements[key] !== true) {
+              throw new Error(`Missing inherited sandbox entitlement ${key} on ${process.env.HELPER_PATH}`);
+            }
+          }
+          console.log(`Verified signed App Sandbox helper: ${process.env.HELPER_PATH}`);
+          NODE
+          done
+          lipo "$APP/Contents/Resources/pi-server" -verify_arch arm64
+          lipo "$APP/Contents/Resources/pi-server-x64" -verify_arch x86_64
+          lipo "$APP/Contents/Resources/pi-node/node" -verify_arch arm64
+          lipo "$APP/Contents/Resources/pi-node/node" -verify_arch x86_64
           (cd "$(dirname "$PKG")" && shasum -a 256 "$(basename "$PKG")" > "$(basename "$PKG").sha256")
           printf 'Bundle: %s\nVersion/build: %s (%s)\nTeam: %s\nMinimum macOS: %s\nSigning: Mac App Store distribution\n' \
             "$BUNDLE" "$VERSION" "$BUILD" "$APPLE_TEAM_ID" "$MINIMUM_MACOS" > dist/mas/BUILD-INFO.txt

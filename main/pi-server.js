@@ -96,6 +96,10 @@ function binaryPath() {
 
 function ensureBinaryExecutable() {
   if (process.platform === 'win32') return; // Windows doesn't need chmod
+  // App Store bundles are sealed after signing and their Resources directory is
+  // read-only at runtime. The MAS workflow sets executable bits before signing
+  // and verifies them in the final package, so do not try to mutate the bundle.
+  if (process.mas && app.isPackaged) return;
   const bin = binaryPath();
   if (!fs.existsSync(bin)) return;
   try {
@@ -332,7 +336,9 @@ function runBinary(bin, args) {
     child.stdout.on('data', (d) => { out += d; });
     child.stderr.on('data', (d) => { out += d; });
     child.on('error', reject);
-    child.on('exit', (code) => (code === 0 ? resolve(out) : reject(new Error(`exit ${code}: ${out}`))));
+    child.on('exit', (code, signal) => (code === 0
+      ? resolve(out)
+      : reject(new Error(`exit code ${code}, signal ${signal || 'none'}: ${out}`))));
   });
 }
 

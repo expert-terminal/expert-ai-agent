@@ -54,6 +54,14 @@ const config = {
     provisioningProfile: profile,
     entitlements: 'build/entitlements.mas.plist',
     entitlementsInherit: 'build/entitlements.mas.inherit.plist',
+    // Explicitly include executable Mach-O files from extraResources so the
+    // signer applies the inherited App Sandbox entitlements and the final
+    // package checks can prove these spawned helpers are sandbox-compatible.
+    binaries: [
+      'Contents/Resources/pi-server',
+      'Contents/Resources/pi-server-x64',
+      'Contents/Resources/pi-node/node',
+    ],
     forceCodeSigning: true,
   },
 };
