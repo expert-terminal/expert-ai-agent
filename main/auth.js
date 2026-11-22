@@ -15,6 +15,7 @@ const WORKER_HOSTS = [
 const WORKER_URL = WORKER_HOSTS[0];
 const POLL_INTERVAL_MS = 3000;
 const POLL_TIMEOUT_MS = 5 * 60 * 1000;
+const DEMO_EMAIL = 'demo@ssv.asia';
 
 async function api(method, path, body, extraHeaders = {}) {
   let lastErr;
@@ -60,9 +61,9 @@ async function continueJobHandoff(session, jobId, state, sessionId, instruction)
   return result.data;
 }
 
-/** Starts device login for `email`, opens the Ghost verify page, and polls until the
- *  session is confirmed (or times out). Returns the same session shape lib/auth.ts
- *  produces on the phone: { token, email, entitlement, sessionExpires, ... }. */
+/** Starts device login for `email`, opening the Ghost verify page for ordinary
+ *  accounts while letting the server-confirmed review account poll immediately.
+ *  Returns { token, email, entitlement, sessionExpires, ... }. */
 async function deviceLogin(email, onStatus) {
   const start = await api('POST', '/auth/start', { email });
   if (!start.ok) {
@@ -70,12 +71,21 @@ async function deviceLogin(email, onStatus) {
   }
 
   const { nonce, authUrl } = start.data;
-  onStatus?.({ phase: 'waiting', authUrl });
-  shell.openExternal(authUrl);
+  // The gateway confirms the shared review account server-side and marks that
+  // response with `demo: true`. Only skip the browser verification for that
+  // exact account and an explicit server confirmation; never grant a session
+  // based on an email string supplied by the client alone.
+  const demoLogin = email.trim().toLowerCase() === DEMO_EMAIL && start.data.demo === true;
+  onStatus?.({ phase: demoLogin ? 'demo' : 'waiting', authUrl: demoLogin ? null : authUrl });
+  if (!demoLogin) shell.openExternal(authUrl);
 
   const deadline = Date.now() + POLL_TIMEOUT_MS;
+  let firstPoll = true;
   while (Date.now() < deadline) {
-    await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
+    if (!demoLogin || !firstPoll) {
+      await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
+    }
+    firstPoll = false;
     const poll = await api('GET', `/auth/poll?nonce=${encodeURIComponent(nonce)}`);
     if (poll.data.status === 'ok') {
       return { ...poll.data, ts: Math.floor(Date.now() / 1000) };

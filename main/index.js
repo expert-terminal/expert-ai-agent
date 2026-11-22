@@ -23,6 +23,7 @@ let store = null;
 let relayClient = null;
 let relayStatus = 'disconnected'; // 'disconnected' | 'connecting' | 'connected' | 'paired'
 let piServer = null;
+let stopWorkspaceAccess = null;
 let piServerStatus = 'stopped'; // 'stopped' | 'starting' | 'running'
 let discoveryBusy = false;
 async function refreshDiscovery() {
@@ -192,6 +193,13 @@ function createTray() {
 app.whenReady().then(() => {
   logger.initLogger();
   store = new Store();
+  if (process.mas && store.get('workdirBookmark')) {
+    try {
+      stopWorkspaceAccess = app.startAccessingSecurityScopedResource(store.get('workdirBookmark'));
+    } catch (error) {
+      logger.log('WARN', 'Could not restore selected workspace access; choose the folder again in Settings:', error?.message || String(error));
+    }
+  }
 
   // Respect the user's explicit startup preference (off by default).
   app.setLoginItemSettings({ openAtLogin: store.get('autoStart'), openAsHidden: true });
@@ -248,6 +256,8 @@ app.whenReady().then(() => {
 
 app.on('before-quit', () => {
   piServer?.shutdown();
+  stopWorkspaceAccess?.();
+  stopWorkspaceAccess = null;
 });
 
 app.on('second-instance', () => {
@@ -259,26 +269,61 @@ app.on('window-all-closed', (e) => e.preventDefault());
 
 // ---- IPC bridge for the settings window ----
 
-ipcMain.handle('settings:get', () => store.all());
+function settingsForRenderer() {
+  const settings = store.all();
+  delete settings.workdirBookmark;
+  return settings;
+}
+
+ipcMain.handle('settings:get', () => settingsForRenderer());
 
 ipcMain.handle('settings:set', (_event, key, value) => {
+  if (process.mas && (key === 'workdir' || key === 'workdirBookmark')) {
+    throw new Error('Choose the workspace with the system folder picker.');
+  }
   store.set(key, value);
   if (key === 'autoStart') {
     app.setLoginItemSettings({ openAtLogin: value, openAsHidden: true });
   }
-  return store.all();
+  return settingsForRenderer();
 });
 
 ipcMain.handle('settings:pickFolder', async () => {
   const result = await dialog.showOpenDialog(settingsWindow, {
     properties: ['openDirectory'],
     defaultPath: store.get('workdir'),
+    securityScopedBookmarks: !!process.mas,
   });
   if (result.canceled || result.filePaths.length === 0) return store.get('workdir');
+  const previousWorkdir = store.get('workdir');
+  const previousBookmark = store.get('workdirBookmark');
+  const nextBookmark = process.mas ? result.bookmarks?.[0] : null;
+  if (process.mas && !nextBookmark) {
+    throw new Error('macOS did not grant access to that folder. Choose it again to grant workspace access.');
+  }
+  const nextStopAccess = nextBookmark
+    ? app.startAccessingSecurityScopedResource(nextBookmark)
+    : null;
+  const previousStopAccess = stopWorkspaceAccess;
   store.set('workdir', result.filePaths[0]);
+  if (process.mas) store.set('workdirBookmark', nextBookmark);
+  stopWorkspaceAccess = nextStopAccess;
   // pi-server reads its working folder from config.toml at startup — regenerate and
   // restart so a folder change actually takes effect, not just on next app launch.
-  piServer?.start(relayClient.getTunnelUrl()).catch((err) => console.error('pi-server restart failed:', err));
+  if (process.mas) {
+    try {
+      await piServer?.start(relayClient.getTunnelUrl());
+    } catch (error) {
+      store.set('workdir', previousWorkdir);
+      store.set('workdirBookmark', previousBookmark);
+      nextStopAccess?.();
+      stopWorkspaceAccess = previousStopAccess;
+      throw error;
+    }
+    previousStopAccess?.();
+  } else {
+    piServer?.start(relayClient.getTunnelUrl()).catch((error) => console.error('pi-server restart failed:', error));
+  }
   return result.filePaths[0];
 });
 
@@ -460,8 +505,12 @@ ipcMain.handle('chats:export', async (_event, filePath) => {
     title: 'Export chat history',
     defaultPath: path.join(app.getPath('documents'), `${safeTitle}.md`),
     filters: [{ name: 'Markdown', extensions: ['md'] }],
+    securityScopedBookmarks: !!process.mas,
   });
   if (result.canceled || !result.filePath) return { canceled: true };
+  if (process.mas && !result.bookmark) {
+    throw new Error('macOS did not grant access to save in that folder. Choose a destination again.');
+  }
   const date = new Date(chat.modifiedAt).toLocaleString();
   const transcript = [
     `# ${chat.title}`,
@@ -472,7 +521,14 @@ ipcMain.handle('chats:export', async (_event, filePath) => {
     '',
     ...chat.messages.flatMap((message) => [`## ${message.role === 'user' ? 'You' : 'Expert AI Agent'}`, '', message.text, '']),
   ].join('\n');
-  await fs.promises.writeFile(result.filePath, transcript, 'utf8');
+  const stopExportAccess = process.mas && result.bookmark
+    ? app.startAccessingSecurityScopedResource(result.bookmark)
+    : null;
+  try {
+    await fs.promises.writeFile(result.filePath, transcript, 'utf8');
+  } finally {
+    stopExportAccess?.();
+  }
   shell.showItemInFolder(result.filePath);
   return { canceled: false, filePath: result.filePath };
 });

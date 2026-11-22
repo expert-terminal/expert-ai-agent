@@ -641,9 +641,10 @@ class PiServerManager {
         EXPERT_AI_RELAY_URL: relayUrl,
         HOME: isolatedHome,
         USERPROFILE: isolatedHome,
-        // The agent's own config stays in isolatedHome, while the authenticated
-        // phone file browser resolves the user's real Desktop and Downloads.
-        EXPERT_AI_HOST_HOME: os.homedir(),
+        // The agent's own config stays in isolatedHome. Direct builds let the
+        // authenticated phone browser resolve the real home; MAS scopes it to
+        // the user-selected workspace instead.
+        EXPERT_AI_HOST_HOME: process.mas ? workdir : os.homedir(),
         // pi-server defaults to `pi_server=debug,tower_http=debug` — that's ~5-10
         // stdout lines per HTTP request, and during an active chat every one of
         // them is piped to this process, appended to the log buffer, sliced, and

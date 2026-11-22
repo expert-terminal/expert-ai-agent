@@ -6,7 +6,10 @@ const { app } = require('electron');
 const DEFAULTS = {
   pairing: null,       // { code } — the relay pairing code, generated locally on first run
   session: null,        // this desktop's OWN gateway session (device-login flow, see auth.js)
-  workdir: app.getPath('documents'),
+  // The MAS build's container cannot access Documents until the user selects
+  // a folder in the system picker. Start inside userData there; direct builds
+  // keep the existing Documents default.
+  workdir: process.mas ? app.getPath('userData') : app.getPath('documents'),
   autoRun: true,        // matches the "auto-run, no confirm prompts" default agreed for v1
   // Starting on login is opt-in. This keeps first-run behavior transparent and
   // gives Store users control over background startup; the tray Settings screen

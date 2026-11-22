@@ -2,6 +2,13 @@
 // used here only to read usage/plan info for display, same GET /balance the
 // phone app's account sheet uses. No APK/worker change involved.
 const GATEWAY_URL = 'https://api.ssv.asia'; // custom domain (verified 2026-08-29); was expert-ai-gateway.arthouse.workers.dev
+const DEMO_EMAIL = 'demo@ssv.asia';
+
+function signInHint(email) {
+  return email.trim().toLowerCase() === DEMO_EMAIL
+    ? 'Signing in to the review account…'
+    : 'Opening your browser to verify with Ghost…';
+}
 
 function formatTokenCount(n) {
   if (n >= 1000000) return `${(n / 1000000).toFixed(1)}M`;
@@ -98,7 +105,7 @@ function formatUsageText(balance) {
   document.getElementById('wizSignInBtn').addEventListener('click', async () => {
     const email = wizEmailEl.value.trim();
     if (!email) return;
-    wizAuthHintEl.textContent = 'Opening your browser to verify with Ghost…';
+    wizAuthHintEl.textContent = signInHint(email);
     const result = await window.expertAgent.signIn(email);
     if (result.error) {
       wizAuthHintEl.textContent = `Error: ${result.error}`;
@@ -262,7 +269,7 @@ function formatUsageText(balance) {
   document.getElementById('signIn').addEventListener('click', async () => {
     const email = emailEl.value.trim();
     if (!email) return;
-    authHintEl.textContent = 'Opening your browser to verify with Ghost…';
+    authHintEl.textContent = signInHint(email);
     const result = await window.expertAgent.signIn(email);
     if (result.error) {
       authHintEl.textContent = `Error: ${result.error}`;
