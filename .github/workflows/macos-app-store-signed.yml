@@ -1,0 +1,180 @@
+name: macOS App Store signed build
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-sign:
+    runs-on: xcode-27
+    env:
+      APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+      MACOS_COPYRIGHT: ${{ vars.MACOS_COPYRIGHT }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure read-only private submodule access
+        env:
+          EXPERT_AI_PHONE_DEPLOY_KEY: ${{ secrets.EXPERT_AI_PHONE_DEPLOY_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$EXPERT_AI_PHONE_DEPLOY_KEY"
+          eval "$(ssh-agent -s)"
+          printf '%s\n' "$EXPERT_AI_PHONE_DEPLOY_KEY" | ssh-add -
+          echo "SSH_AUTH_SOCK=$SSH_AUTH_SOCK" >> "$GITHUB_ENV"
+          echo "SSH_AGENT_PID=$SSH_AGENT_PID" >> "$GITHUB_ENV"
+          mkdir -p "$HOME/.ssh"
+          ssh-keyscan -H github.com >> "$HOME/.ssh/known_hosts"
+          git config --global url."git@github.com:".insteadOf "https://github.com/"
+
+      - name: Check App Store build settings
+        run: |
+          set -euo pipefail
+          test -n "$APPLE_TEAM_ID"
+          test -n "$MACOS_COPYRIGHT"
+          [[ "$APPLE_TEAM_ID" =~ ^[A-Z0-9]{10}$ ]]
+          node - <<'NODE'
+          const pkg = require('./package.json');
+          if (pkg.build?.appId !== 'asia.ssv.expert-ai-agent') throw new Error('Unexpected Mac bundle ID.');
+          if (pkg.version !== '0.1.6') throw new Error(`Expected source version 0.1.6, got ${pkg.version}.`);
+          NODE
+          xcodebuild -version
+
+      - name: Initialize private phone submodule
+        run: git submodule update --init --recursive --depth 1 vendor/expert-ai-phone
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: vendor/expert-ai-phone/backend -> target
+
+      - name: Build Pi server for macOS
+        run: |
+          set -euo pipefail
+          cd vendor/expert-ai-phone/backend
+          cargo build --locked --release --target aarch64-apple-darwin
+          cargo build --locked --release --target x86_64-apple-darwin
+          cp target/aarch64-apple-darwin/release/pi-server ../../../resources/
+          cp target/x86_64-apple-darwin/release/pi-server ../../../resources/pi-server-x64
+
+      - name: Bundle universal macOS Node runtime
+        run: |
+          set -euo pipefail
+          NODE_VERSION=v22.19.0
+          for arch in arm64 x64; do
+            curl -fsSL "https://nodejs.org/dist/${NODE_VERSION}/node-${NODE_VERSION}-darwin-${arch}.tar.gz" -o "node-${arch}.tar.gz"
+            tar -xzf "node-${arch}.tar.gz"
+          done
+          lipo -create \
+            "node-${NODE_VERSION}-darwin-arm64/bin/node" \
+            "node-${NODE_VERSION}-darwin-x64/bin/node" \
+            -output resources/pi-node/node
+          chmod +x resources/pi-node/node resources/pi-node/pi resources/pi-server resources/pi-server-x64
+          lipo resources/pi-node/node -verify_arch arm64
+          lipo resources/pi-node/node -verify_arch x86_64
+          lipo resources/pi-server -verify_arch arm64
+          lipo resources/pi-server-x64 -verify_arch x86_64
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.23.2
+          cache: npm
+
+      - name: Install dependencies and prepare app binaries
+        run: |
+          npm ci
+          node scripts/setup-binaries.js
+          rm -f resources/pi-server.exe resources/pi-node/node.exe resources/pi-node/pi.cmd resources/pi-node/pi.ps1
+
+      - name: Install Mac App Store provisioning profile
+        env:
+          MAS_PROVISIONING_PROFILE_BASE64: ${{ secrets.MAS_PROVISIONING_PROFILE_BASE64 }}
+        run: |
+          set -euo pipefail
+          test -n "$MAS_PROVISIONING_PROFILE_BASE64"
+          PROFILE_PATH="$RUNNER_TEMP/ExpertAI-Agent-AppStore.provisionprofile"
+          printf '%s' "$MAS_PROVISIONING_PROFILE_BASE64" | tr -d '\r\n ' | base64 -D > "$PROFILE_PATH"
+          test -s "$PROFILE_PATH"
+          security cms -D -i "$PROFILE_PATH" -o "$RUNNER_TEMP/mas-profile.plist"
+          PROFILE_TEAM=$(/usr/libexec/PlistBuddy -c 'Print :TeamIdentifier:0' "$RUNNER_TEMP/mas-profile.plist")
+          PROFILE_APP_ID=$(/usr/libexec/PlistBuddy -c 'Print :Entitlements:application-identifier' "$RUNNER_TEMP/mas-profile.plist")
+          test "$PROFILE_TEAM" = "$APPLE_TEAM_ID"
+          case "$PROFILE_APP_ID" in *.asia.ssv.expert-ai-agent) ;; *) echo 'Provisioning profile does not match asia.ssv.expert-ai-agent.'; exit 1 ;; esac
+          echo "MAS_PROVISIONING_PROFILE=$PROFILE_PATH" >> "$GITHUB_ENV"
+          unset MAS_PROVISIONING_PROFILE_BASE64
+
+      - name: Build universal signed Mac App Store package
+        env:
+          CSC_LINK: ${{ secrets.MAS_APP_DISTRIBUTION_P12_BASE64 }}
+          CSC_KEY_PASSWORD: ${{ secrets.MAS_APP_DISTRIBUTION_P12_PASSWORD }}
+          CSC_INSTALLER_LINK: ${{ secrets.MAS_INSTALLER_DISTRIBUTION_P12_BASE64 }}
+          CSC_INSTALLER_KEY_PASSWORD: ${{ secrets.MAS_INSTALLER_DISTRIBUTION_P12_PASSWORD }}
+          MACOS_BUILD_VERSION: ${{ github.run_number }}
+        run: |
+          set -euo pipefail
+          test -n "$CSC_LINK"
+          test -n "$CSC_KEY_PASSWORD"
+          test -n "$CSC_INSTALLER_LINK"
+          test -n "$CSC_INSTALLER_KEY_PASSWORD"
+          npm run build:mas
+
+      - name: Verify signature, bundle identity, and build metadata
+        run: |
+          set -euo pipefail
+          mapfile -t PACKAGES < <(find dist/mas -maxdepth 1 -type f -name '*.pkg' -print)
+          if [[ "${#PACKAGES[@]}" -ne 1 ]]; then
+            echo "Expected one universal Mac App Store package, found ${#PACKAGES[@]}"
+            exit 1
+          fi
+          PKG="${PACKAGES[0]}"
+          pkgutil --check-signature "$PKG"
+          EXPANDED="$RUNNER_TEMP/mas-expanded"
+          pkgutil --expand-full "$PKG" "$EXPANDED"
+          APP=$(find "$EXPANDED" -type d -name 'Expert AI Agent.app' -print -quit)
+          test -n "$APP"
+          codesign --verify --deep --strict --verbose=2 "$APP"
+          SIGNATURE=$(codesign -dv --verbose=4 "$APP" 2>&1)
+          printf '%s\n' "$SIGNATURE" | grep -F "TeamIdentifier=$APPLE_TEAM_ID"
+          BUNDLE=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Contents/Info.plist")
+          VERSION=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Contents/Info.plist")
+          BUILD=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$APP/Contents/Info.plist")
+          MINIMUM_MACOS=$(/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' "$APP/Contents/Info.plist" 2>/dev/null || printf 'Electron default')
+          test "$BUNDLE" = 'asia.ssv.expert-ai-agent'
+          test "$VERSION" = '0.1.6'
+          test "$BUILD" = "$GITHUB_RUN_NUMBER"
+          codesign -d --entitlements :- "$APP" > "$RUNNER_TEMP/mas-entitlements.plist" 2>/dev/null
+          node - "$RUNNER_TEMP/mas-entitlements.plist" <<'NODE'
+          const fs = require('node:fs');
+          const plist = require('plist');
+          const entitlements = plist.parse(fs.readFileSync(process.argv[2], 'utf8'));
+          for (const key of [
+            'com.apple.security.app-sandbox',
+            'com.apple.security.network.client',
+            'com.apple.security.network.server',
+            'com.apple.security.files.user-selected.read-write',
+            'com.apple.security.files.bookmarks.app-scope',
+          ]) {
+            if (entitlements[key] !== true) throw new Error(`Missing MAS entitlement: ${key}`);
+          }
+          NODE
+          (cd "$(dirname "$PKG")" && shasum -a 256 "$(basename "$PKG")" > "$(basename "$PKG").sha256")
+          printf 'Bundle: %s\nVersion/build: %s (%s)\nTeam: %s\nMinimum macOS: %s\nSigning: Mac App Store distribution\n' \
+            "$BUNDLE" "$VERSION" "$BUILD" "$APPLE_TEAM_ID" "$MINIMUM_MACOS" > dist/mas/BUILD-INFO.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ExpertAI-Agent-Mac-App-Store-signed
+          path: |
+            dist/mas/*.pkg
+            dist/mas/*.pkg.sha256
+            dist/mas/BUILD-INFO.txt
+          if-no-files-found: error
+          retention-days: 14
