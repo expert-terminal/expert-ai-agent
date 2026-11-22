@@ -39,6 +39,7 @@ const config = {
   },
   mac: {
     target: [{ target: 'mas', arch: ['universal'] }],
+    x64ArchFiles: 'Contents/Resources/{pi-node/node,pi-server,pi-server-x64}',
     extendInfo: {
       ...packageJson.build.mac.extendInfo,
       NSHumanReadableCopyright: copyright,
