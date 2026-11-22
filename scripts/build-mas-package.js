@@ -32,15 +32,12 @@ if (!/^\d+(\.\d+){0,2}$/.test(buildVersion)) {
 }
 
 const config = {
-  ...packageJson.build,
   buildVersion,
   artifactName: '${productName}-${version}-mas-${arch}.${ext}',
   directories: {
-    ...packageJson.build.directories,
     output: process.env.MAS_OUTPUT_DIR || 'dist/mas',
   },
   mac: {
-    ...packageJson.build.mac,
     target: [{ target: 'mas', arch: ['universal'] }],
     extendInfo: {
       ...packageJson.build.mac.extendInfo,
