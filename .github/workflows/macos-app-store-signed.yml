@@ -146,6 +146,32 @@ jobs:
           test -n "$CSC_INSTALLER_KEY_PASSWORD"
           npm run build:mas
 
+      - name: Create signed Mac App Store installer package
+        env:
+          MAS_INSTALLER_P12_BASE64: ${{ secrets.MAS_INSTALLER_DISTRIBUTION_P12_BASE64 }}
+          MAS_INSTALLER_P12_PASSWORD: ${{ secrets.MAS_INSTALLER_DISTRIBUTION_P12_PASSWORD }}
+        run: |
+          set -euo pipefail
+          APP="$PWD/dist/mas/mas-universal/Expert AI Agent.app"
+          test -d "$APP"
+          KEYCHAIN="$RUNNER_TEMP/mas-installer.keychain-db"
+          KEYCHAIN_PASSWORD="$(openssl rand -hex 24)"
+          P12_PATH="$RUNNER_TEMP/mas-installer-signing.p12"
+          PKG="$PWD/dist/mas/ExpertAI-Agent-0.1.6-mas-universal.pkg"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          printf '%s' "$MAS_INSTALLER_P12_BASE64" | tr -d '\r\n ' | base64 -D > "$P12_PATH"
+          security import "$P12_PATH" -k "$KEYCHAIN" -P "$MAS_INSTALLER_P12_PASSWORD" -T /usr/bin/productbuild
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          INSTALLER_IDENTITY=$(security find-identity -v "$KEYCHAIN" | awk -F'"' '/3rd Party Mac Developer Installer:/ { print $2; exit }')
+          test -n "$INSTALLER_IDENTITY"
+          case "$INSTALLER_IDENTITY" in *"$APPLE_TEAM_ID"*) ;; *) echo 'Installer signing identity is from the wrong Apple team.'; exit 1 ;; esac
+          productbuild --sign "$INSTALLER_IDENTITY" --keychain "$KEYCHAIN" --component "$APP" /Applications "$PKG"
+          pkgutil --check-signature "$PKG"
+          security delete-keychain "$KEYCHAIN"
+          rm -f "$P12_PATH"
+
       - name: Verify signature, bundle identity, and build metadata
         run: |
           set -euo pipefail
