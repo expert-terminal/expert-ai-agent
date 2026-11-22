@@ -245,6 +245,14 @@ jobs:
               throw new Error(`Missing inherited sandbox entitlement ${key} on ${process.env.HELPER_PATH}`);
             }
           }
+          const duplicatedSandboxRights = Object.keys(entitlements).filter((key) =>
+            key.startsWith('com.apple.security.') &&
+            !key.startsWith('com.apple.security.cs.') &&
+            !['com.apple.security.app-sandbox', 'com.apple.security.inherit'].includes(key)
+          );
+          if (duplicatedSandboxRights.length) {
+            throw new Error(`Child helper repeats parent App Sandbox rights (${duplicatedSandboxRights.join(', ')}): ${process.env.HELPER_PATH}`);
+          }
           console.log(`Verified signed App Sandbox helper: ${process.env.HELPER_PATH}`);
           NODE
           done
