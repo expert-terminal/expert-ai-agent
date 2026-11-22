@@ -215,12 +215,28 @@ jobs:
           printf 'Bundle: %s\nVersion/build: %s (%s)\nTeam: %s\nMinimum macOS: %s\nSigning: Mac App Store distribution\n' \
             "$BUNDLE" "$VERSION" "$BUILD" "$APPLE_TEAM_ID" "$MINIMUM_MACOS" > dist/mas/BUILD-INFO.txt
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: ExpertAI-Agent-Mac-App-Store-signed
-          path: |
-            dist/mas/*.pkg
-            dist/mas/*.pkg.sha256
-            dist/mas/BUILD-INFO.txt
-          if-no-files-found: error
-          retention-days: 14
+      - name: Upload signed package to App Store Connect for TestFlight processing
+        env:
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$APP_STORE_CONNECT_KEY_ID"
+          test -n "$APP_STORE_CONNECT_ISSUER_ID"
+          test -n "$APP_STORE_CONNECT_PRIVATE_KEY"
+          PKG="$PWD/dist/mas/ExpertAI-Agent-0.1.6-mas-universal.pkg"
+          test -s "$PKG"
+          (cd "$(dirname "$PKG")" && shasum -a 256 -c "$(basename "$PKG").sha256")
+          KEY_DIR="$HOME/.appstoreconnect/private_keys"
+          mkdir -p "$KEY_DIR"
+          KEY_PATH="$KEY_DIR/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8"
+          printf '%s\n' "$APP_STORE_CONNECT_PRIVATE_KEY" > "$KEY_PATH"
+          chmod 600 "$KEY_PATH"
+          unset APP_STORE_CONNECT_PRIVATE_KEY
+          xcrun altool --upload-app \
+            --file "$PKG" \
+            --type macos \
+            --apiKey "$APP_STORE_CONNECT_KEY_ID" \
+            --apiIssuer "$APP_STORE_CONNECT_ISSUER_ID" \
+            --output-format json
