@@ -105,7 +105,7 @@ jobs:
           test -s "$PROFILE_PATH"
           security cms -D -i "$PROFILE_PATH" -o "$RUNNER_TEMP/mas-profile.plist"
           PROFILE_TEAM=$(/usr/libexec/PlistBuddy -c 'Print :TeamIdentifier:0' "$RUNNER_TEMP/mas-profile.plist")
-          PROFILE_APP_ID=$(/usr/libexec/PlistBuddy -c 'Print :Entitlements:application-identifier' "$RUNNER_TEMP/mas-profile.plist")
+          PROFILE_APP_ID=$(/usr/libexec/PlistBuddy -c 'Print :Entitlements:com.apple.application-identifier' "$RUNNER_TEMP/mas-profile.plist")
           test "$PROFILE_TEAM" = "$APPLE_TEAM_ID"
           case "$PROFILE_APP_ID" in *.asia.ssv.expert-ai-agent) ;; *) echo 'Provisioning profile does not match asia.ssv.expert-ai-agent.'; exit 1 ;; esac
           echo "MAS_PROVISIONING_PROFILE=$PROFILE_PATH" >> "$GITHUB_ENV"
