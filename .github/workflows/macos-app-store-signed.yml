@@ -126,8 +126,16 @@ jobs:
           security cms -D -i "$PROFILE_PATH" -o "$RUNNER_TEMP/mas-profile.plist"
           PROFILE_TEAM=$(/usr/libexec/PlistBuddy -c 'Print :TeamIdentifier:0' "$RUNNER_TEMP/mas-profile.plist")
           PROFILE_APP_ID=$(/usr/libexec/PlistBuddy -c 'Print :Entitlements:com.apple.application-identifier' "$RUNNER_TEMP/mas-profile.plist")
+          EXPECTED_APP_GROUP="$APPLE_TEAM_ID.asia.ssv.expert-ai-agent"
+          PROFILE_APP_GROUPS=$(/usr/libexec/PlistBuddy -c 'Print :Entitlements:com.apple.security.application-groups' "$RUNNER_TEMP/mas-profile.plist" 2>/dev/null || true)
           test "$PROFILE_TEAM" = "$APPLE_TEAM_ID"
           case "$PROFILE_APP_ID" in *.asia.ssv.expert-ai-agent) ;; *) echo 'Provisioning profile does not match asia.ssv.expert-ai-agent.'; exit 1 ;; esac
+          if ! printf '%s\n' "$PROFILE_APP_GROUPS" | grep -Fq "$EXPECTED_APP_GROUP" \
+            && ! printf '%s\n' "$PROFILE_APP_GROUPS" | grep -Fq "$APPLE_TEAM_ID.*"; then
+            echo "Provisioning profile does not authorize required macOS App Group: $EXPECTED_APP_GROUP"
+            exit 1
+          fi
+          echo "Provisioning profile authorizes macOS App Group: $EXPECTED_APP_GROUP"
           echo "MAS_PROVISIONING_PROFILE=$PROFILE_PATH" >> "$GITHUB_ENV"
           unset MAS_PROVISIONING_PROFILE_BASE64
 
@@ -199,7 +207,7 @@ jobs:
           test "$BUILD" = "$GITHUB_RUN_NUMBER"
           test "$MULTIPLE_INSTANCES_PROHIBITED" = 'true'
           codesign -d --entitlements :- "$APP" > "$RUNNER_TEMP/mas-entitlements.plist" 2>/dev/null
-          node - "$RUNNER_TEMP/mas-entitlements.plist" <<'NODE'
+          EXPECTED_APP_GROUP="$APPLE_TEAM_ID.asia.ssv.expert-ai-agent" node - "$RUNNER_TEMP/mas-entitlements.plist" <<'NODE'
           const fs = require('node:fs');
           const plist = require('plist');
           const entitlements = plist.parse(fs.readFileSync(process.argv[2], 'utf8'));
@@ -212,6 +220,12 @@ jobs:
           ]) {
             if (entitlements[key] !== true) throw new Error(`Missing MAS entitlement: ${key}`);
           }
+          const expectedGroup = process.env.EXPECTED_APP_GROUP;
+          const groups = entitlements['com.apple.security.application-groups'];
+          if (!Array.isArray(groups) || !groups.includes(expectedGroup)) {
+            throw new Error(`Missing required App Group entitlement: ${expectedGroup}`);
+          }
+          console.log(`Verified app-group entitlement: ${expectedGroup}`);
           NODE
           (cd "$(dirname "$PKG")" && shasum -a 256 "$(basename "$PKG")" > "$(basename "$PKG").sha256")
           printf 'Bundle: %s\nVersion/build: %s (%s)\nTeam: %s\nMinimum macOS: %s\nSigning: Mac App Store distribution\n' \
