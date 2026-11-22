@@ -101,9 +101,6 @@
       "category": "Utility"
     }
   },
-  "directories": {
-    "test": "test"
-  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/ssv-asia/expert-ai-tray.git"
