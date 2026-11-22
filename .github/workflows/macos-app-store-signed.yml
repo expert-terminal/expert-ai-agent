@@ -14,8 +14,20 @@ jobs:
       MACOS_COPYRIGHT: ${{ vars.MACOS_COPYRIGHT }}
     steps:
       - uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.EXPERT_AI_PHONE_TOKEN || github.token }}
+
+      - name: Configure read-only private submodule access
+        env:
+          EXPERT_AI_PHONE_DEPLOY_KEY: ${{ secrets.EXPERT_AI_PHONE_DEPLOY_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$EXPERT_AI_PHONE_DEPLOY_KEY"
+          eval "$(ssh-agent -s)"
+          printf '%s\n' "$EXPERT_AI_PHONE_DEPLOY_KEY" | ssh-add -
+          echo "SSH_AUTH_SOCK=$SSH_AUTH_SOCK" >> "$GITHUB_ENV"
+          echo "SSH_AGENT_PID=$SSH_AGENT_PID" >> "$GITHUB_ENV"
+          mkdir -p "$HOME/.ssh"
+          ssh-keyscan -H github.com >> "$HOME/.ssh/known_hosts"
+          git config --global url."git@github.com:".insteadOf "https://github.com/"
 
       - name: Check App Store build settings
         run: |
