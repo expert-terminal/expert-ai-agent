@@ -41,7 +41,7 @@ const config = {
     target: [{ target: 'mas', arch: ['universal'] }],
     // The arm64-specific prebuilds are bundled in both architecture passes.
     // Keep those files as-is during the universal merge instead of trying to lipo them.
-    x64ArchFiles: 'Contents/Resources/{pi-node/node,pi-server,pi-server-x64,**/prebuilds/darwin-arm64/**/*.node}',
+    x64ArchFiles: 'Contents/Resources/{pi-node/node,pi-server,pi-server-x64,**/prebuilds/darwin-*/**/*.node}',
     extendInfo: {
       ...packageJson.build.mac.extendInfo,
       NSHumanReadableCopyright: copyright,
